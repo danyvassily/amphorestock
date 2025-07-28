@@ -46,7 +46,8 @@ export interface Product {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string; // UID de l'utilisateur
+  createdBy: string; // UID de l'utilisateur qui a créé
+  modifiedBy?: string; // UID de l'utilisateur qui a modifié (optionnel car pas présent sur les anciens produits)
 }
 
 export type ProductCategory = 
@@ -117,4 +118,89 @@ export interface ImportResult {
     vins: number;
     total: number;
   };
+}
+
+// Types pour l'IA
+export interface AIRequest {
+  prompt: string;
+  data?: any;
+  userId?: string;
+  action?: AIAction;
+}
+
+export interface AIResponse {
+  success: boolean;
+  response: string;
+  usage?: {
+    promptTokens?: number;
+    candidatesTokens?: number;
+    totalTokens?: number;
+  };
+  timestamp: string;
+  error?: string;
+  details?: string;
+}
+
+export type AIAction = 
+  | 'analyze_stock'
+  | 'generate_report'
+  | 'import_file'
+  | 'categorize_product'
+  | 'restock_suggestion'
+  | 'update_data'
+  | 'summarize_sales'
+  | 'general';
+
+export interface AILog {
+  id?: string;
+  prompt: string;
+  action: AIAction;
+  response?: string;
+  userId: string;
+  dataSize?: number;
+  timestamp: Date;
+  success: boolean;
+  error?: string;
+}
+
+export interface PresetPrompt {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  action: AIAction;
+  icon: string;
+  requiresData?: boolean;
+  category: 'analysis' | 'import' | 'management' | 'reporting';
+}
+
+export interface FileUploadResult {
+  success: boolean;
+  fileName: string;
+  fileSize: number;
+  processedData?: any;
+  error?: string;
+}
+
+// Types pour les cocktails
+export interface CocktailIngredient {
+  name: string;
+  category: 'spiritueux' | 'liqueur' | 'vin' | 'biere' | 'soft' | 'autre';
+  quantity: number;
+  unit: 'cl' | 'ml' | 'trait' | 'cuillère' | 'pièce';
+  optional?: boolean;
+}
+
+export interface CocktailRecipe {
+  id: string;
+  name: string;
+  category: 'classique' | 'moderne' | 'digestif' | 'aperitif' | 'tropical' | 'hiver';
+  difficulty: 1 | 2 | 3 | 4 | 5;
+  glassType: string;
+  preparationTime: number; // en minutes
+  ingredients: CocktailIngredient[];
+  instructions: string[];
+  garnish?: string;
+  description: string;
+  tags: string[];
 } 

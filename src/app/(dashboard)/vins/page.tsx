@@ -47,8 +47,10 @@ import { useStocks } from "@/hooks/useStocks";
 import { StockService } from "@/lib/stockService";
 import { getCategoryColor, getCategoryLabel } from "@/lib/product-classifier";
 import { EditProductCategoryDialog } from "@/components/edit-product-category-dialog";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function VinsPage() {
+  const { user } = useAuth();
   // Filtrer uniquement les vins
   const { stocks, loading, error } = useStocks();
   const [filteredWines, setFilteredWines] = useState<Product[]>([]);
@@ -152,7 +154,9 @@ export default function VinsPage() {
         productId, 
         newQuantity, 
         adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)'
+        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
+        undefined,
+        user?.uid || 'anonymous'
       );
       
       toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);

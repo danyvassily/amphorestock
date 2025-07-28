@@ -49,8 +49,10 @@ import { useStocks } from "@/hooks/useStocks";
 import { StockService } from "@/lib/stockService";
 import { getCategoryColor, getCategoryLabel, classifyProduct } from "@/lib/product-classifier";
 import { EditProductCategoryDialog } from "@/components/edit-product-category-dialog";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function BoissonsPage() {
+  const { user } = useAuth();
   // Filtrer uniquement les boissons non-alcoolisées et bières
   const { stocks, loading, error } = useStocks();
   const [filteredBoissons, setFilteredBoissons] = useState<Product[]>([]);
@@ -187,7 +189,9 @@ export default function BoissonsPage() {
         productId, 
         newQuantity, 
         adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)'
+        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
+        undefined,
+        user?.uid || 'anonymous'
       );
       
       toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);

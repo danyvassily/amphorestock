@@ -48,8 +48,10 @@ import { useStocks } from "@/hooks/useStocks";
 import { StockService } from "@/lib/stockService";
 import { getCategoryColor, getCategoryLabel, classifyProduct } from "@/lib/product-classifier";
 import { EditProductCategoryDialog } from "@/components/edit-product-category-dialog";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function SpiriteuxPage() {
+  const { user } = useAuth();
   // Filtrer uniquement les spiritueux
   const { stocks, loading, error } = useStocks();
   const [filteredSpiritueux, setFilteredSpiritueux] = useState<Product[]>([]);
@@ -180,7 +182,9 @@ export default function SpiriteuxPage() {
         productId, 
         newQuantity, 
         adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)'
+        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
+        undefined,
+        user?.uid || 'anonymous'
       );
       
       toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);

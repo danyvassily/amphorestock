@@ -17,6 +17,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { toast } from "sonner";
 import { ProductCategory, ProductUnit } from "@/types";
 import Link from "next/link";
+import { useAuth } from "@/contexts/auth-context";
+import { StockService } from "@/lib/stockService";
 
 const productSchema = z.object({
   name: z.string().min(2, "Le nom doit contenir au moins 2 caractères"),
@@ -30,7 +32,7 @@ const productSchema = z.object({
   prixBouteille: z.number().optional(),
   description: z.string().optional(),
   fournisseur: z.string().optional(),
-  codeBarre: z.string().optional(),
+
   seuilAlerte: z.number().min(0, "Le seuil d'alerte doit être positif"),
   isActive: z.boolean(),
 });
@@ -60,6 +62,7 @@ const units: { value: ProductUnit; label: string }[] = [
 ];
 
 export default function AddProductPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -74,18 +77,34 @@ export default function AddProductPage() {
       isActive: true,
       description: "",
       fournisseur: "",
-      codeBarre: "",
+
     },
   });
 
   const onSubmit = async (data: ProductFormData) => {
     setLoading(true);
     try {
-      // TODO: Ajouter le produit à Firestore
-      console.log("Données du produit:", data);
+      // Préparer les données du produit pour Firestore
+      const productData = {
+        nom: data.name,
+        categorie: data.category,
+        subcategory: data.subcategory,
+        quantite: data.quantity,
+        unite: data.unit,
+        prixAchat: data.prixAchat,
+        prixVente: data.prixVente,
+        prixVerre: data.prixVerre,
+        prixBouteille: data.prixBouteille,
+        description: data.description,
+        fournisseur: data.fournisseur,
+        seuilAlerte: data.seuilAlerte,
+        source: data.category === 'vins' || data.category === 'vin-rouge' || data.category === 'vin-blanc' || data.category === 'vin-rose' ? 'vins' : 'boissons',
+        isActive: data.isActive,
+        createdBy: user?.uid || 'anonymous',
+      };
       
-      // Simulation de l'ajout
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Ajouter le produit via StockService
+      await StockService.addProduct(productData);
       
       toast.success("Produit ajouté avec succès !");
       router.push("/stock");
@@ -221,19 +240,7 @@ export default function AddProductPage() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="codeBarre"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Code-barres</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: 1234567890123" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
                 </div>
               </CardContent>
             </Card>

@@ -6,7 +6,34 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Zap, 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { 
+  Play, 
+  Pause,
+  Square,
+  Clock,
   Search, 
   Minus,
   Plus,
@@ -16,23 +43,110 @@ import {
   Wine,
   Coffee,
   ShoppingCart,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Zap,
+  Users,
+  DollarSign,
+  Activity,
+  ChefHat,
+  Moon,
+  Sun,
+  Timer,
+  BarChart3,
+  Check,
+  X,
+  RefreshCw,
+  ArrowUp,
+  Bell,
+  Star,
+  Truck,
+  AlertCircle,
 } from "lucide-react";
 import { Product } from "@/types";
 import { toast } from "sonner";
 import { useStocks } from "@/hooks/useStocks";
 import { StockService } from "@/lib/stockService";
+import { getCategoryColor, getCategoryLabel } from "@/lib/product-classifier";
+import { useAuth } from "@/contexts/auth-context";
+
+// Types pour le service
+interface ServiceSession {
+  id: string;
+  type: 'midi' | 'soir';
+  startTime: Date;
+  endTime?: Date;
+  isActive: boolean;
+  sales: ServiceSale[];
+}
+
+interface ServiceSale {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  category: string;
+  timestamp: Date;
+}
+
+interface ServiceStats {
+  totalSales: number;
+  totalRevenue: number;
+  totalProfit: number;
+  averageBasket: number;
+  topCategory: string;
+  salesCount: number;
+}
 
 export default function ServicePage() {
+  const { user } = useAuth();
   const { stocks, loading, error, lowStockCount } = useStocks();
+  
+  // États du service
+  const [currentSession, setCurrentSession] = useState<ServiceSession | null>(null);
+  const [serviceTimer, setServiceTimer] = useState<number>(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  
+  // États des ventes
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [quickSellQuantities, setQuickSellQuantities] = useState<{ [key: string]: number }>({});
+  
+  // États des dialogues
+  const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [sellQuantity, setSellQuantity] = useState(1);
+  const [tableNumber, setTableNumber] = useState("");
+  
+  // États des statistiques
+  const [serviceStats, setServiceStats] = useState<ServiceStats>({
+    totalSales: 0,
+    totalRevenue: 0,
+    totalProfit: 0,
+    averageBasket: 0,
+    topCategory: '',
+    salesCount: 0,
+  });
+
+  // Timer effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isTimerRunning) {
+      interval = setInterval(() => {
+        setServiceTimer(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isTimerRunning]);
 
   // Filtrer les produits
   useEffect(() => {
-    let filtered = stocks;
+    let filtered = stocks.filter(product => product.isActive && product.quantite > 0);
 
     // Filtrage par recherche
     if (searchTerm) {
@@ -52,22 +166,91 @@ export default function ServicePage() {
     setFilteredProducts(filtered);
   }, [stocks, searchTerm, selectedCategory]);
 
-  const handleQuickSell = async (productId: string, quantity: number = 1) => {
-    try {
-      setActionLoading(productId);
-      const product = stocks.find(p => p.id === productId);
-      if (!product) return;
+  // Fonctions du timer
+  const startService = (type: 'midi' | 'soir') => {
+    const newSession: ServiceSession = {
+      id: Date.now().toString(),
+      type,
+      startTime: new Date(),
+      isActive: true,
+      sales: [],
+    };
+    
+    setCurrentSession(newSession);
+    setServiceTimer(0);
+    setIsTimerRunning(true);
+    
+    toast.success(`Service ${type} démarré !`, {
+      description: `Timer activé - ${type === 'midi' ? '🌅' : '🌙'}`
+    });
+  };
 
+  const pauseService = () => {
+    setIsTimerRunning(!isTimerRunning);
+    toast.info(isTimerRunning ? "Service mis en pause" : "Service repris");
+  };
+
+  const endService = () => {
+    if (currentSession) {
+      const updatedSession = {
+        ...currentSession,
+        endTime: new Date(),
+        isActive: false,
+      };
+      setCurrentSession(null);
+      setIsTimerRunning(false);
+      setServiceTimer(0);
+      
+      toast.success("Service terminé !", {
+        description: `Durée : ${formatTime(serviceTimer)} | CA : €${serviceStats.totalRevenue.toFixed(2)}`
+      });
+    }
+  };
+
+  // Fonction de vente rapide
+  const handleQuickSell = async (product: Product, quantity: number = 1) => {
+    if (!currentSession) {
+      toast.error("Aucun service actif ! Démarrez un service d'abord.");
+      return;
+    }
+
+    try {
+      setActionLoading(product.id);
+      
       if (product.quantite < quantity) {
         toast.error(`Stock insuffisant (${product.quantite} disponible)`);
         return;
       }
 
-      await StockService.sellProduct(productId, quantity);
-      toast.success(`${quantity} ${product.unite} vendu(s) - ${product.nom}`);
+      // Simuler la vente (dans une vraie app, ça ferait appel à l'API)
+      const sale: ServiceSale = {
+        id: Date.now().toString(),
+        productId: product.id,
+        productName: product.nom,
+        quantity,
+        unitPrice: product.prixVente,
+        totalPrice: product.prixVente * quantity,
+        category: product.categorie,
+        timestamp: new Date(),
+      };
+
+      // Mettre à jour la session
+      const updatedSession = {
+        ...currentSession,
+        sales: [...currentSession.sales, sale],
+      };
+      setCurrentSession(updatedSession);
+
+      // Mettre à jour les stats
+      updateServiceStats(updatedSession.sales);
+
+      // Réduire le stock
+      await StockService.sellProduct(product.id, quantity, user?.uid || 'anonymous');
       
-      // Reset la quantité saisie
-      setQuickSellQuantities(prev => ({ ...prev, [productId]: 1 }));
+      toast.success(`Vendu : ${quantity} ${product.unite} - ${product.nom}`, {
+        description: `Table ${tableNumber || 'N/A'} | €${sale.totalPrice.toFixed(2)}`
+      });
+
     } catch (error) {
       console.error("Erreur vente:", error);
       toast.error("Erreur lors de la vente");
@@ -76,15 +259,56 @@ export default function ServicePage() {
     }
   };
 
-  const handleCustomQuantity = (productId: string, quantity: number) => {
-    setQuickSellQuantities(prev => ({ 
-      ...prev, 
-      [productId]: Math.max(1, quantity) 
-    }));
+  // Fonction de vente avec dialogue
+  const handleSellWithDialog = (product: Product) => {
+    setSelectedProduct(product);
+    setSellQuantity(1);
+    setIsSellDialogOpen(true);
   };
 
-  const getQuickQuantity = (productId: string): number => {
-    return quickSellQuantities[productId] || 1;
+  const confirmSale = async () => {
+    if (selectedProduct) {
+      await handleQuickSell(selectedProduct, sellQuantity);
+      setIsSellDialogOpen(false);
+      setSelectedProduct(null);
+      setSellQuantity(1);
+      setTableNumber("");
+    }
+  };
+
+  // Mettre à jour les statistiques du service
+  const updateServiceStats = (sales: ServiceSale[]) => {
+    const stats: ServiceStats = {
+      totalSales: sales.reduce((sum, sale) => sum + sale.quantity, 0),
+      totalRevenue: sales.reduce((sum, sale) => sum + sale.totalPrice, 0),
+      totalProfit: sales.reduce((sum, sale) => sum + (sale.totalPrice * 0.6), 0), // Estimation 60% de marge
+      salesCount: sales.length,
+      averageBasket: sales.length > 0 ? sales.reduce((sum, sale) => sum + sale.totalPrice, 0) / sales.length : 0,
+      topCategory: getTopCategory(sales),
+    };
+    setServiceStats(stats);
+  };
+
+  const getTopCategory = (sales: ServiceSale[]): string => {
+    const categoryCount: { [key: string]: number } = {};
+    sales.forEach(sale => {
+      categoryCount[sale.category] = (categoryCount[sale.category] || 0) + sale.quantity;
+    });
+    
+    return Object.keys(categoryCount).reduce((a, b) => 
+      categoryCount[a] > categoryCount[b] ? a : b, ''
+    );
+  };
+
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getServiceIcon = (type: 'midi' | 'soir') => {
+    return type === 'midi' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />;
   };
 
   const getCategoryIcon = (category: string) => {
@@ -101,275 +325,384 @@ export default function ServicePage() {
     }
   };
 
-  const categories = [
-    { value: "all", label: "Tous", count: stocks.length },
-    { value: "vins", label: "Vins", count: stocks.filter(p => p.categorie === 'vins').length },
-    { value: "vin-rouge", label: "Rouges", count: stocks.filter(p => p.categorie === 'vin-rouge').length },
-    { value: "vin-blanc", label: "Blancs", count: stocks.filter(p => p.categorie === 'vin-blanc').length },
-    { value: "vin-rose", label: "Rosés", count: stocks.filter(p => p.categorie === 'vin-rose').length },
-    { value: "spiritueux", label: "Spiritueux", count: stocks.filter(p => p.categorie === 'spiritueux').length },
-    { value: "bieres", label: "Bières", count: stocks.filter(p => p.categorie === 'bieres').length },
-    { value: "softs", label: "Softs", count: stocks.filter(p => p.categorie === 'softs').length },
-  ].filter(cat => cat.count > 0);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Chargement...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-red-600">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
-            <p>{error}</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const getCurrentTimeCategory = (): 'midi' | 'soir' => {
+    const hour = new Date().getHours();
+    return hour >= 11 && hour <= 15 ? 'midi' : 'soir';
+  };
 
   return (
     <div className="space-y-6">
-      {/* En-tête */}
+      {/* En-tête avec contrôles de service */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Zap className="h-8 w-8 text-blue-500" />
-            Service Rapide
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Zap className="h-8 w-8 text-yellow-500" />
+            Gestion Service
           </h1>
           <p className="text-muted-foreground">
-            Gestion rapide des ventes et décrément de stock en direct
+            Suivi des ventes en temps réel - Service {getCurrentTimeCategory()}
           </p>
         </div>
-        {lowStockCount > 0 && (
-          <Badge variant="destructive" className="text-sm">
-            {lowStockCount} produit(s) en stock faible
-          </Badge>
-        )}
+        
+        <div className="flex items-center space-x-2">
+          {!currentSession ? (
+            <>
+              <Button 
+                onClick={() => startService('midi')} 
+                className="bg-blue-500 hover:bg-blue-600"
+              >
+                <Sun className="mr-2 h-4 w-4" />
+                Service Midi
+              </Button>
+              <Button 
+                onClick={() => startService('soir')} 
+                className="bg-purple-500 hover:bg-purple-600"
+              >
+                <Moon className="mr-2 h-4 w-4" />
+                Service Soir
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center space-x-2 px-4 py-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                {getServiceIcon(currentSession.type)}
+                <span className="font-semibold">Service {currentSession.type}</span>
+                <Badge variant="secondary" className="ml-2">
+                  <Timer className="mr-1 h-3 w-3" />
+                  {formatTime(serviceTimer)}
+                </Badge>
+              </div>
+              
+              <Button
+                onClick={pauseService}
+                variant="outline"
+                size="sm"
+              >
+                {isTimerRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+              
+              <Button
+                onClick={endService}
+                variant="destructive"
+                size="sm"
+              >
+                <Square className="mr-2 h-4 w-4" />
+                Terminer
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Statistiques rapides */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Produits Disponibles</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{filteredProducts.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Stock Faible</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{lowStockCount}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Recherche Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{searchTerm ? "OUI" : "NON"}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Statistiques du service en cours */}
+      {currentSession && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ventes</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{serviceStats.totalSales}</div>
+              <p className="text-xs text-muted-foreground">
+                {serviceStats.salesCount} transactions
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Recherche et Filtres */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Chiffre d'Affaires</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{serviceStats.totalRevenue.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">
+                en {formatTime(serviceTimer)}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Bénéfices</CardTitle>
+              <Target className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{serviceStats.totalProfit.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">
+                ~60% de marge
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Panier Moyen</CardTitle>
+              <BarChart3 className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{serviceStats.averageBasket.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">
+                par transaction
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Top Catégorie</CardTitle>
+              <Star className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg font-bold">{getCategoryLabel(serviceStats.topCategory as any) || 'N/A'}</div>
+              <p className="text-xs text-muted-foreground">
+                le plus vendu
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Filtres de recherche */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un produit..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-lg"
-                autoFocus
-              />
+        <CardHeader>
+          <CardTitle>Recherche Produits</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un produit..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
             </div>
             
-            <div className="flex gap-2 flex-wrap">
-              {categories.map((category) => (
-                <Button
-                  key={category.value}
-                  variant={selectedCategory === category.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category.value)}
-                  className="flex items-center gap-1"
-                >
-                  {category.label}
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {category.count}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                <SelectItem value="vins">Vins</SelectItem>
+                <SelectItem value="spiritueux">Spiritueux</SelectItem>
+                <SelectItem value="bieres">Bières</SelectItem>
+                <SelectItem value="softs">Softs</SelectItem>
+                <SelectItem value="jus">Jus</SelectItem>
+                <SelectItem value="eaux">Eaux</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Grille des produits */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredProducts.map((product) => {
-          const isLowStock = product.quantite <= product.seuilAlerte;
-          const quickQty = getQuickQuantity(product.id);
-          const isLoading = actionLoading === product.id;
-          
-          return (
-            <Card key={product.id} className={`relative ${isLowStock ? 'border-orange-500' : ''}`}>
-              {isLowStock && (
-                <div className="absolute top-2 right-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                </div>
-              )}
-              
-              <CardHeader className="pb-3">
-                <div className="flex items-start gap-2">
-                  {getCategoryIcon(product.categorie)}
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-sm font-medium truncate">
-                      {product.nom}
-                    </CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="outline" className="text-xs">
-                        {product.categorie.replace('-', ' ')}
-                      </Badge>
-                      <span className={`text-xs font-medium ${isLowStock ? 'text-orange-500' : ''}`}>
-                        {product.quantite} {product.unite}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="space-y-3">
-                {/* Prix */}
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Vente:</span>
-                    <div className="font-medium">
-                      {new Intl.NumberFormat('fr-FR', {
-                        style: 'currency',
-                        currency: 'EUR',
-                      }).format(product.prixVente)}
-                    </div>
-                  </div>
-                  {product.prixVerre && (
-                    <div>
-                      <span className="text-muted-foreground">Verre:</span>
-                      <div className="font-medium">
-                        {new Intl.NumberFormat('fr-FR', {
-                          style: 'currency',
-                          currency: 'EUR',
-                        }).format(product.prixVerre)}
+      {/* Liste des produits */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center">
+              <Package className="mr-2 h-5 w-5" />
+              Produits Disponibles
+            </span>
+            <Badge variant="secondary">
+              {filteredProducts.length} produits
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produit</TableHead>
+                  <TableHead>Catégorie</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead>Prix</TableHead>
+                  <TableHead>Actions Rapides</TableHead>
+                  <TableHead>Vente Personnalisée</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      <div className="font-medium">{product.nom}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {product.unite}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        {getCategoryIcon(product.categorie)}
+                        <Badge 
+                          variant="outline" 
+                          className={`${getCategoryColor(product.categorie)} border capitalize`}
+                        >
+                          {getCategoryLabel(product.categorie)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className={`font-medium ${product.quantite <= product.seuilAlerte ? 'text-red-600' : ''}`}>
+                        {product.quantite}
+                      </div>
+                      {product.quantite <= product.seuilAlerte && (
+                        <div className="flex items-center text-red-600 text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Stock faible
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">€{product.prixVente.toFixed(2)}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickSell(product, 1)}
+                          disabled={actionLoading === product.id || !currentSession}
+                        >
+                          {actionLoading === product.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>1</>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickSell(product, 2)}
+                          disabled={actionLoading === product.id || !currentSession}
+                        >
+                          2
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleQuickSell(product, 5)}
+                          disabled={actionLoading === product.id || !currentSession}
+                        >
+                          5
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSellWithDialog(product)}
+                        disabled={!currentSession}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Vente
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
-                {/* Contrôles de quantité */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCustomQuantity(product.id, quickQty - 1)}
-                    disabled={quickQty <= 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </Button>
-                  
-                  <Input
-                    type="number"
-                    min="1"
-                    max={product.quantite}
-                    value={quickQty}
-                    onChange={(e) => handleCustomQuantity(product.id, parseInt(e.target.value) || 1)}
-                    className="h-8 text-center"
-                  />
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleCustomQuantity(product.id, quickQty + 1)}
-                    disabled={quickQty >= product.quantite}
-                    className="h-8 w-8 p-0"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </div>
-
-                {/* Bouton de vente */}
+      {/* Dialogue de vente personnalisée */}
+      <Dialog open={isSellDialogOpen} onOpenChange={setIsSellDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Vente - {selectedProduct?.nom}</DialogTitle>
+            <DialogDescription>
+              Configurer les détails de la vente
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Quantité</label>
+              <div className="flex items-center space-x-2 mt-1">
                 <Button
-                  onClick={() => handleQuickSell(product.id, quickQty)}
-                  disabled={isLoading || product.quantite < quickQty}
-                  className="w-full"
-                  variant={isLowStock ? "destructive" : "default"}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSellQuantity(Math.max(1, sellQuantity - 1))}
                 >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                  )}
-                  Vendre {quickQty} {product.unite}
-                  {quickQty > 1 && "s"}
+                  <Minus className="h-4 w-4" />
                 </Button>
-
-                {/* Boutons rapides pour les vins */}
-                {(product.categorie.includes('vin') || product.categorie === 'spiritueux') && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickSell(product.id, 1)}
-                      disabled={isLoading || product.quantite < 1}
-                      className="text-xs"
-                    >
-                      Verre
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuickSell(product.id, 1)}
-                      disabled={isLoading || product.quantite < 1}
-                      className="text-xs"
-                    >
-                      Bouteille
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Message si aucun produit */}
-      {filteredProducts.length === 0 && (
-        <Card>
-          <CardContent className="pt-12 pb-12">
-            <div className="text-center">
-              <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Aucun produit trouvé</h3>
-              <p className="text-muted-foreground">
-                {searchTerm 
-                  ? `Aucun produit ne correspond à "${searchTerm}"`
-                  : "Aucun produit disponible dans cette catégorie"
-                }
-              </p>
+                <Input
+                  type="number"
+                  value={sellQuantity}
+                  onChange={(e) => setSellQuantity(Number(e.target.value))}
+                  className="w-20 text-center"
+                  min="1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSellQuantity(sellQuantity + 1)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+            
+            <div>
+              <label className="text-sm font-medium">Numéro de table (optionnel)</label>
+              <Input
+                value={tableNumber}
+                onChange={(e) => setTableNumber(e.target.value)}
+                placeholder="Ex: Table 5, Bar, Terrasse..."
+                className="mt-1"
+              />
+            </div>
+            
+            <div className="p-4 bg-muted rounded-lg">
+              <div className="flex justify-between text-sm">
+                <span>Prix unitaire :</span>
+                <span>€{selectedProduct?.prixVente.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm mt-1">
+                <span>Quantité :</span>
+                <span>{sellQuantity}</span>
+              </div>
+              <div className="flex justify-between font-semibold mt-2 pt-2 border-t">
+                <span>Total :</span>
+                <span>€{((selectedProduct?.prixVente || 0) * sellQuantity).toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSellDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={confirmSale}>
+              <Check className="mr-2 h-4 w-4" />
+              Confirmer la vente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alertes de stock faible */}
+      {lowStockCount > 0 && (
+        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+          <CardHeader>
+            <CardTitle className="flex items-center text-orange-800 dark:text-orange-200">
+              <AlertCircle className="mr-2 h-5 w-5" />
+              Alertes Stock
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-orange-700 dark:text-orange-300">
+              {lowStockCount} produit(s) ont un stock faible. 
+              <Button variant="link" className="text-orange-600 p-0 ml-1">
+                Voir les alertes
+              </Button>
+            </p>
           </CardContent>
         </Card>
       )}

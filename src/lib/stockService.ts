@@ -40,11 +40,12 @@ export class StockService {
   /**
    * Mettre à jour un produit
    */
-  static async updateProduct(id: string, updates: Partial<Product>): Promise<void> {
+  static async updateProduct(id: string, updates: Partial<Product>, userId = 'system'): Promise<void> {
     const docRef = doc(db, 'stocks', id);
     await updateDoc(docRef, {
       ...updates,
       updatedAt: Timestamp.fromDate(new Date()),
+      modifiedBy: userId,
     });
   }
 

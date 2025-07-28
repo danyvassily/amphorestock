@@ -14,30 +14,38 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import NoSSR, { useIsClient } from "@/components/no-ssr";
+
+function LoadingSpinner() {
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="text-center">
+        <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-primary"></div>
+        <p className="mt-4 text-muted-foreground">Chargement...</p>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedContent({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const isClient = useIsClient();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (isClient && !loading && !user) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, isClient]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center">
-          <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-primary"></div>
-          <p className="mt-4 text-muted-foreground">Chargement...</p>
-        </div>
-      </div>
-    );
+  // Pendant l'hydration ou le loading, afficher le spinner
+  if (!isClient || loading) {
+    return <LoadingSpinner />;
   }
 
+  // Si pas d'utilisateur après le loading, ne rien afficher (redirection en cours)
   if (!user) {
-    return null;
+    return <LoadingSpinner />;
   }
 
   return (
@@ -78,7 +86,9 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthProvider>
-      <ProtectedContent>{children}</ProtectedContent>
+      <NoSSR fallback={<LoadingSpinner />}>
+        <ProtectedContent>{children}</ProtectedContent>
+      </NoSSR>
     </AuthProvider>
   );
 } 

@@ -23,6 +23,7 @@ import { StockService } from "@/lib/stockService";
 import { toast } from "sonner";
 import { Loader2, ArrowRight } from "lucide-react";
 import { getCategoryColor, getCategoryLabel } from "@/lib/product-classifier";
+import { useAuth } from "@/contexts/auth-context";
 
 interface EditProductCategoryDialogProps {
   product: Product | null;
@@ -49,6 +50,7 @@ export function EditProductCategoryDialog({
   isOpen, 
   onClose 
 }: EditProductCategoryDialogProps) {
+  const { user } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<ProductCategory | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -59,7 +61,7 @@ export function EditProductCategoryDialog({
       setIsLoading(true);
       await StockService.updateProduct(product.id, {
         categorie: selectedCategory
-      });
+      }, user?.uid || 'anonymous');
       
       toast.success(`Produit déplacé vers ${getCategoryLabel(selectedCategory)}`);
       onClose();

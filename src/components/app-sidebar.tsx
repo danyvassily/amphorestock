@@ -8,6 +8,7 @@ import {
   History,
   User,
   Settings,
+  Brain,
   Wine,
   Coffee,
   Zap,
@@ -40,6 +41,11 @@ const menuItems = [
     icon: Home,
   },
   {
+    title: "Intelligence IA",
+    url: "/ai",
+    icon: Brain,
+  },
+  {
     title: "Service Rapide",
     url: "/service",
     icon: Zap,
@@ -54,14 +60,19 @@ const menuItems = [
     url: "/produits/add",
     icon: PlusCircle,
   },
-  {
-    title: "Historique",
-    url: "/historique",
-    icon: History,
-  },
+          {
+          title: "Historique",
+          url: "/historique",
+          icon: History,
+        },
+        {
+          title: "Import IA",
+          url: "/import-ai",
+          icon: Brain,
+        },
   {
     title: "Statistiques",
-    url: "/stats",
+    url: "/statistiques",
     icon: BarChart3,
   },
 ];

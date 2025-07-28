@@ -1,8 +1,9 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
+// Configuration Firebase pour Amphore Stock
 const firebaseConfig = {
   apiKey: "AIzaSyDx4gKFQtbDFqhZDpZ6gFEJ7JhPeSXPhEc",
   authDomain: "amphore-stock.firebaseapp.com",
@@ -13,18 +14,27 @@ const firebaseConfig = {
   measurementId: "G-7LMYPEWM0T"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialiser Firebase (éviter la double initialisation)
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Initialize Firebase services
+// Services Firebase
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const googleProvider = new GoogleAuthProvider();
 
-// Initialize Analytics (only on client side)
+// Configuration du provider Google Auth
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
+// Analytics avec protection d'hydration
 let analytics: any = null;
 if (typeof window !== "undefined") {
-  analytics = getAnalytics(app);
+  try {
+    analytics = getAnalytics(app);
+  } catch (error) {
+    console.warn('Analytics non disponible:', error);
+  }
 }
 
 export { analytics };

@@ -43,8 +43,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useStocks } from "@/hooks/useStocks";
 import { StockService } from "@/lib/stockService";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function StockPage() {
+  const { user } = useAuth();
   const { stocks, loading, error, totalValue, lowStockCount, categoriesStats } = useStocks();
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -128,7 +130,9 @@ export default function StockPage() {
         productId, 
         newQuantity, 
         adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)'
+        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
+        undefined,
+        user?.uid || 'anonymous'
       );
       
       toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);

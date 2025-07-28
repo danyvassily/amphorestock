@@ -38,54 +38,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Protection d'hydration - ne s'exécute que côté client
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Créer ou récupérer le profil utilisateur dans Firestore
   const getUserProfile = async (firebaseUser: FirebaseUser): Promise<User> => {
-    const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-    
-    if (userDoc.exists()) {
-      return userDoc.data() as User;
-    } else {
-      // Créer un nouveau profil utilisateur
-      const newUser: User = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email!,
-        displayName: firebaseUser.displayName || '',
-        photoURL: firebaseUser.photoURL || '',
-        role: 'staff', // Rôle par défaut
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    try {
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       
-      await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-      return newUser;
+      if (userDoc.exists()) {
+        return userDoc.data() as User;
+      } else {
+        // Créer un nouveau profil utilisateur
+        const newUser: User = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          displayName: firebaseUser.displayName || '',
+          photoURL: firebaseUser.photoURL || '',
+          role: 'staff', // Rôle par défaut
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        
+        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+        return newUser;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération du profil:', error);
+      throw error;
     }
   };
 
   useEffect(() => {
+    // Ne s'exécuter que côté client après hydration
+    if (!isHydrated) return;
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       
-      if (firebaseUser) {
-        try {
+      try {
+        if (firebaseUser) {
           const userProfile = await getUserProfile(firebaseUser);
           setUser(userProfile);
           setFirebaseUser(firebaseUser);
-        } catch (error) {
-          console.error('Erreur lors de la récupération du profil:', error);
+        } else {
           setUser(null);
           setFirebaseUser(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Erreur Auth:', error);
         setUser(null);
         setFirebaseUser(null);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return unsubscribe;
-  }, []);
+  }, [isHydrated]);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
@@ -136,6 +150,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signInWithGoogle,
     logout,
   };
+
+  // Afficher un loading initial jusqu'à l'hydration
+  if (!isHydrated) {
+    return (
+      <AuthContext.Provider value={{
+        user: null,
+        firebaseUser: null,
+        loading: true,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        logout,
+      }}>
+        {children}
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
