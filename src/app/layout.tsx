@@ -16,7 +16,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Amphore - Gestion de Stock",
-  description: "Application SaaS pour la gestion de stock de boissons et vins",
+  description: "Application SaaS pour la gestion de stock de boissons et vins pour restaurants et bars",
+  keywords: "gestion stock, restaurant, bar, vins, spiritueux, inventaire",
+  authors: [{ name: "Dany-Steven Manfoumbi Vassiliakos" }],
+  creator: "Dany-Steven Manfoumbi Vassiliakos",
+  robots: "index, follow",
+  openGraph: {
+    title: "Amphore - Gestion de Stock",
+    description: "Application SaaS pour la gestion de stock de boissons et vins",
+    type: "website",
+    locale: "fr_FR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Amphore - Gestion de Stock",
+    description: "Application SaaS pour la gestion de stock de boissons et vins",
+  },
 };
 
 export default function RootLayout({

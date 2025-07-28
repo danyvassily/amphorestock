@@ -305,4 +305,218 @@ export class AIService {
       return `Erreur lors de l'analyse des ventes: ${error instanceof Error ? error.message : 'Erreur inconnue'}`;
     }
   }
+
+  /**
+   * Retourne les prompts prédéfinis
+   */
+  static getPresetPrompts() {
+    return [
+      {
+        title: "📊 Analyser le stock actuel",
+        prompt: "Analysez l'état actuel de mon stock et donnez-moi des recommandations",
+        category: "stock",
+        requiresConfirmation: false
+      },
+      {
+        title: "🍹 Suggestions de cocktails",
+        prompt: "Quels cocktails puis-je faire avec mon stock actuel ?",
+        category: "cocktails",
+        requiresConfirmation: false
+      },
+      {
+        title: "📈 Rapport des ventes",
+        prompt: "Générez un rapport détaillé des ventes de la semaine",
+        category: "ventes",
+        requiresConfirmation: false
+      },
+      {
+        title: "🛒 Suggestions de commande",
+        prompt: "Quels produits dois-je commander en priorité ?",
+        category: "restock",
+        requiresConfirmation: false
+      },
+      {
+        title: "💰 Analyse de rentabilité",
+        prompt: "Analysez la rentabilité de mes produits et optimisations possibles",
+        category: "finance",
+        requiresConfirmation: false
+      }
+    ];
+  }
+
+  /**
+   * Appel générique à l'API Gemini via notre endpoint
+   */
+  static async callGemini(request: {
+    prompt: string;
+    userId: string;
+    action: string;
+    data?: any;
+  }): Promise<AIResponse> {
+    try {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erreur API: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Erreur callGemini:', error);
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Analyse le stock avec l'IA
+   */
+  static async analyzeStock(userId: string): Promise<AIResponse> {
+    try {
+      const { products } = await this.getStockData();
+      
+      const stockAnalysis = {
+        totalProducts: products.length,
+        activeProducts: products.filter(p => p.isActive).length,
+        lowStockProducts: products.filter(p => p.quantite <= p.seuilAlerte),
+        categories: products.reduce((acc: any, p) => {
+          acc[p.categorie] = (acc[p.categorie] || 0) + 1;
+          return acc;
+        }, {}),
+        totalValue: products.reduce((sum, p) => sum + (p.quantite * p.prixAchat), 0)
+      };
+
+      return await this.callGemini({
+        prompt: "Analysez cet état de stock et donnez des recommandations détaillées",
+        userId,
+        action: 'stock_analysis',
+        data: stockAnalysis
+      });
+    } catch (error) {
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur lors de l\'analyse du stock',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Génère un rapport avec l'IA
+   */
+  static async generateReport(period: string, userId: string): Promise<AIResponse> {
+    try {
+      const reportData = await this.generateStockReport();
+      
+      return await this.callGemini({
+        prompt: `Générez un rapport détaillé pour la période "${period}" basé sur ces données`,
+        userId,
+        action: 'generate_report',
+        data: { period, reportData }
+      });
+    } catch (error) {
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur lors de la génération du rapport',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Suggestions de réapprovisionnement
+   */
+  static async getRestockSuggestions(userId: string): Promise<AIResponse> {
+    try {
+      const { products } = await this.getStockData();
+      const lowStockProducts = products.filter(p => p.quantite <= p.seuilAlerte);
+      
+      return await this.callGemini({
+        prompt: "Analysez ces produits en stock faible et proposez un plan de réapprovisionnement",
+        userId,
+        action: 'restock_suggestions',
+        data: { lowStockProducts, totalProducts: products.length }
+      });
+    } catch (error) {
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur lors de la génération des suggestions',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Suggestions de cocktails basées sur le stock
+   */
+  static async getSuggestedCocktails(userId: string, prompt: string): Promise<AIResponse> {
+    try {
+      const { products } = await this.getStockData();
+      const availableProducts = products
+        .filter(p => p.isActive && p.quantite > 0)
+        .map(p => ({ nom: p.nom, categorie: p.categorie, quantite: p.quantite }));
+      
+      return await this.callGemini({
+        prompt: `${prompt}\n\nBasez-vous sur ce stock disponible pour suggérer des cocktails`,
+        userId,
+        action: 'suggest_cocktails',
+        data: { availableProducts }
+      });
+    } catch (error) {
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur lors de la génération des suggestions de cocktails',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Traite un fichier uploadé
+   */
+  static async processUploadedFile(file: File, userId: string): Promise<AIResponse> {
+    try {
+      // Lire le contenu du fichier
+      const fileContent = await this.readFileContent(file);
+      
+      return await this.callGemini({
+        prompt: "Analysez ce fichier et extrayez les informations utiles pour la gestion de stock",
+        userId,
+        action: 'process_file',
+        data: { fileName: file.name, fileContent: fileContent.substring(0, 3000) }
+      });
+    } catch (error) {
+      return {
+        success: false,
+        response: '',
+        error: error instanceof Error ? error.message : 'Erreur lors du traitement du fichier',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Lit le contenu d'un fichier
+   */
+  private static async readFileContent(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string || '');
+      reader.onerror = () => reject(new Error('Erreur de lecture du fichier'));
+      reader.readAsText(file);
+    });
+  }
 } 

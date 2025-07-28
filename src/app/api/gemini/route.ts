@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const GEMINI_API_KEY = "AIzaSyD2EyD2KxSIQe_0BWQIUses_1JPEHlwNXQ";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 // Fonction pour retry automatique en cas de surcharge
