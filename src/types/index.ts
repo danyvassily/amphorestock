@@ -12,11 +12,11 @@ export interface User {
 
 export interface Product {
   id: string;
-  nom: string; // Renommé de 'name' pour correspondre aux besoins
-  categorie: ProductCategory; // Renommé de 'category' pour correspondre aux besoins
+  nom: string; // Nom du produit
+  categorie: ProductCategory; // Catégorie du produit
   subcategory?: string;
-  quantite: number; // Renommé de 'quantity' pour correspondre aux besoins
-  unite: ProductUnit; // Renommé de 'unit' pour correspondre aux besoins
+  quantite: number; // Quantité en stock
+  unite: ProductUnit; // Unité de mesure
   prixAchat: number; // Prix d'achat principal
   prixVente: number; // Prix de vente principal
   

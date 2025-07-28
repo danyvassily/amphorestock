@@ -49,7 +49,7 @@ function toNumber(value: any): number {
 function parseVinsFile(): Product[] {
   console.log('📋 Parsing du fichier vins...');
   
-  const filePath = 'src/donnees/L\'Almanach Montmartre - vins - coûts matières - 2024.xlsx';
+  const filePath = '../src/donnees/L\'Almanach Montmartre - vins - coûts matières - 2024.xlsx';
   const workbook = XLSX.readFile(filePath);
   const worksheet = workbook.Sheets['Actuels ']; // Note l'espace à la fin
   const rawData = XLSX.utils.sheet_to_json(worksheet);
@@ -131,7 +131,7 @@ function parseVinsFile(): Product[] {
 function parseBoissonsFile(): Product[] {
   console.log('📋 Parsing du fichier boissons...');
   
-  const filePath = 'src/donnees/Stocks boisson juillet 2025.xlsx';
+  const filePath = '../src/donnees/Stocks boisson juillet 2025.xlsx';
   const workbook = XLSX.readFile(filePath);
   const worksheet = workbook.Sheets['Stocks et prix '];
   const rawData = XLSX.utils.sheet_to_json(worksheet);
