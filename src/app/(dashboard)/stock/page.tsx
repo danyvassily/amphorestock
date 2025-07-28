@@ -34,109 +34,33 @@ import {
   Filter,
   Download,
   Zap,
+  Loader2,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { Product } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
-
-// Mock data étendu - sera remplacé par les données Firestore
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Château Margaux 2019',
-    category: 'vins',
-    subcategory: 'Rouge',
-    quantity: 12,
-    unit: 'bouteille',
-    prixAchat: 180,
-    prixVente: 220,
-    prixVerre: 25,
-    seuilAlerte: 5,
-    fournisseur: 'Caviste Martin',
-    isActive: true,
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '2',
-    name: 'Hendricks Gin',
-    category: 'spiritueux',
-    quantity: 8,
-    unit: 'bouteille',
-    prixAchat: 35,
-    prixVente: 45,
-    prixVerre: 8,
-    seuilAlerte: 3,
-    fournisseur: 'Distrib Pro',
-    isActive: true,
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '3',
-    name: 'Kronenbourg 1664',
-    category: 'bieres',
-    quantity: 24,
-    unit: 'bouteille',
-    prixAchat: 2.5,
-    prixVente: 4.5,
-    seuilAlerte: 10,
-    fournisseur: 'Brasserie Direct',
-    isActive: true,
-    createdAt: new Date('2024-01-12'),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '4',
-    name: 'Coca-Cola',
-    category: 'softs',
-    quantity: 2, // Stock faible
-    unit: 'cannette',
-    prixAchat: 1.2,
-    prixVente: 3,
-    seuilAlerte: 20,
-    fournisseur: 'Metro',
-    isActive: true,
-    createdAt: new Date('2024-01-08'),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '5',
-    name: 'Evian 1L',
-    category: 'eaux',
-    quantity: 45,
-    unit: 'bouteille',
-    prixAchat: 0.8,
-    prixVente: 2.5,
-    seuilAlerte: 15,
-    fournisseur: 'Metro',
-    isActive: true,
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  }
-];
+import { useStocks } from "@/hooks/useStocks";
+import { StockService } from "@/lib/stockService";
 
 export default function StockPage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const { stocks, loading, error, totalValue, lowStockCount, categoriesStats } = useStocks();
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [sortField, setSortField] = useState<keyof Product>("name");
+  const [sortField, setSortField] = useState<keyof Product>("nom");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Filtrer et trier les produits
   useEffect(() => {
-    let filtered = products;
+    let filtered = stocks;
 
     // Filtrage par recherche
     if (searchTerm) {
       filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.fournisseur?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -144,9 +68,9 @@ export default function StockPage() {
     // Filtrage par catégorie
     if (selectedCategory !== "all") {
       if (selectedCategory === "low-stock") {
-        filtered = filtered.filter(product => product.quantity <= product.seuilAlerte);
+        filtered = filtered.filter(product => product.quantite <= product.seuilAlerte);
       } else {
-        filtered = filtered.filter(product => product.category === selectedCategory);
+        filtered = filtered.filter(product => product.categorie === selectedCategory);
       }
     }
 
@@ -169,7 +93,7 @@ export default function StockPage() {
     });
 
     setFilteredProducts(filtered);
-  }, [products, searchTerm, selectedCategory, sortField, sortDirection]);
+  }, [stocks, searchTerm, selectedCategory, sortField, sortDirection]);
 
   const handleSort = (field: keyof Product) => {
     if (sortField === field) {
@@ -182,12 +106,37 @@ export default function StockPage() {
 
   const handleDelete = async (productId: string) => {
     try {
-      // TODO: Supprimer de Firestore
-      setProducts(prev => prev.filter(p => p.id !== productId));
+      setActionLoading(productId);
+      await StockService.deleteProduct(productId);
       toast.success("Produit supprimé");
     } catch (error) {
       console.error("Erreur suppression:", error);
       toast.error("Erreur lors de la suppression");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleQuickAdjustment = async (productId: string, adjustment: number) => {
+    try {
+      setActionLoading(`${productId}-${adjustment > 0 ? 'add' : 'remove'}`);
+      const product = stocks.find(p => p.id === productId);
+      if (!product) return;
+
+      const newQuantity = Math.max(0, product.quantite + adjustment);
+      await StockService.updateQuantity(
+        productId, 
+        newQuantity, 
+        adjustment > 0 ? 'entree' : 'sortie',
+        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)'
+      );
+      
+      toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);
+    } catch (error) {
+      console.error("Erreur ajustement:", error);
+      toast.error("Erreur lors de l'ajustement");
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -200,23 +149,26 @@ export default function StockPage() {
 
   const getTotalValue = () => {
     return filteredProducts.reduce((total, product) => 
-      total + (product.quantity * product.prixAchat), 0
+      total + (product.quantite * product.prixAchat), 0
     );
   };
 
   const getLowStockCount = () => {
-    return products.filter(product => product.quantity <= product.seuilAlerte).length;
+    return stocks.filter(product => product.quantite <= product.seuilAlerte).length;
   };
 
   const categories = [
-    { value: "all", label: "Tous les produits", count: products.length },
+    { value: "all", label: "Tous les produits", count: stocks.length },
     { value: "low-stock", label: "Stock faible", count: getLowStockCount() },
-    { value: "vins", label: "Vins", count: products.filter(p => p.category === 'vins').length },
-    { value: "spiritueux", label: "Spiritueux", count: products.filter(p => p.category === 'spiritueux').length },
-    { value: "bieres", label: "Bières", count: products.filter(p => p.category === 'bieres').length },
-    { value: "softs", label: "Softs", count: products.filter(p => p.category === 'softs').length },
-    { value: "eaux", label: "Eaux", count: products.filter(p => p.category === 'eaux').length },
-  ];
+    { value: "vins", label: "Vins", count: stocks.filter(p => p.categorie === 'vins').length },
+    { value: "vin-rouge", label: "Vins rouges", count: stocks.filter(p => p.categorie === 'vin-rouge').length },
+    { value: "vin-blanc", label: "Vins blancs", count: stocks.filter(p => p.categorie === 'vin-blanc').length },
+    { value: "vin-rose", label: "Vins rosés", count: stocks.filter(p => p.categorie === 'vin-rose').length },
+    { value: "spiritueux", label: "Spiritueux", count: stocks.filter(p => p.categorie === 'spiritueux').length },
+    { value: "bieres", label: "Bières", count: stocks.filter(p => p.categorie === 'bieres').length },
+    { value: "softs", label: "Softs", count: stocks.filter(p => p.categorie === 'softs').length },
+    { value: "eaux", label: "Eaux", count: stocks.filter(p => p.categorie === 'eaux').length },
+  ].filter(cat => cat.count > 0); // Ne montrer que les catégories avec des produits
 
   const SortIcon = ({ field }: { field: keyof Product }) => {
     if (sortField !== field) return null;
@@ -224,6 +176,29 @@ export default function StockPage() {
       <TrendingUp className="h-4 w-4" /> : 
       <TrendingDown className="h-4 w-4" />;
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Chargement des stocks...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-red-600">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
+            <p>{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -235,7 +210,7 @@ export default function StockPage() {
             Gestion du Stock
           </h1>
           <p className="text-muted-foreground">
-            Vue complète et gestion de votre inventaire
+            Vue complète et gestion de votre inventaire ({stocks.length} produits)
           </p>
         </div>
         <div className="flex gap-2">
@@ -328,11 +303,6 @@ export default function StockPage() {
                 </Button>
               ))}
             </div>
-            
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Exporter
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -349,26 +319,26 @@ export default function StockPage() {
                 <TableRow>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("name")}
+                    onClick={() => handleSort("nom")}
                   >
                     <div className="flex items-center gap-2">
-                      Produit <SortIcon field="name" />
+                      Produit <SortIcon field="nom" />
                     </div>
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("category")}
+                    onClick={() => handleSort("categorie")}
                   >
                     <div className="flex items-center gap-2">
-                      Catégorie <SortIcon field="category" />
+                      Catégorie <SortIcon field="categorie" />
                     </div>
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted text-right"
-                    onClick={() => handleSort("quantity")}
+                    onClick={() => handleSort("quantite")}
                   >
                     <div className="flex items-center gap-2 justify-end">
-                      Stock <SortIcon field="quantity" />
+                      Stock <SortIcon field="quantite" />
                     </div>
                   </TableHead>
                   <TableHead 
@@ -387,19 +357,19 @@ export default function StockPage() {
                       Prix Vente <SortIcon field="prixVente" />
                     </div>
                   </TableHead>
-                  <TableHead>Fournisseur</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  const isLowStock = product.quantity <= product.seuilAlerte;
+                  const isLowStock = product.quantite <= product.seuilAlerte;
                   
                   return (
                     <TableRow key={product.id}>
                       <TableCell>
                         <div>
-                          <div className="font-medium">{product.name}</div>
+                          <div className="font-medium">{product.nom}</div>
                           {product.subcategory && (
                             <div className="text-sm text-muted-foreground">
                               {product.subcategory}
@@ -409,12 +379,12 @@ export default function StockPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
-                          {product.category}
+                          {product.categorie.replace('-', ' ')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className={`font-medium ${isLowStock ? 'text-red-500' : ''}`}>
-                          {product.quantity} {product.unit}
+                          {product.quantite} {product.unite}
                           {isLowStock && (
                             <AlertTriangle className="inline h-4 w-4 ml-1" />
                           )}
@@ -435,31 +405,69 @@ export default function StockPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {product.fournisseur || "-"}
+                        <Badge variant="secondary" className="capitalize">
+                          {product.source}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Modifier
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => handleDelete(product.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Supprimer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1 justify-end">
+                          {/* Boutons d'ajustement rapide */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuickAdjustment(product.id, -1)}
+                            disabled={actionLoading === `${product.id}-remove`}
+                            className="h-8 w-8 p-0"
+                          >
+                            {actionLoading === `${product.id}-remove` ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Minus className="h-3 w-3" />
+                            )}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuickAdjustment(product.id, 1)}
+                            disabled={actionLoading === `${product.id}-add`}
+                            className="h-8 w-8 p-0"
+                          >
+                            {actionLoading === `${product.id}-add` ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                          </Button>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Modifier
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => handleDelete(product.id)}
+                                disabled={actionLoading === product.id}
+                              >
+                                {actionLoading === product.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                )}
+                                Supprimer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -473,7 +481,10 @@ export default function StockPage() {
               <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold mb-2">Aucun produit trouvé</h3>
               <p className="text-muted-foreground mb-4">
-                Aucun produit ne correspond à vos critères de recherche
+                {searchTerm || selectedCategory !== "all" 
+                  ? "Aucun produit ne correspond à vos critères de recherche"
+                  : "Commencez par importer vos données Excel ou ajouter des produits"
+                }
               </p>
               <Button asChild>
                 <Link href="/produits/add">

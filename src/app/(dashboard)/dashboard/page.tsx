@@ -13,66 +13,15 @@ import {
   Coffee,
   Plus,
   Zap,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-import { DashboardStats, Product } from "@/types";
-
-// Mock data - sera remplacé par les données Firestore
-const mockStats: DashboardStats = {
-  totalProducts: 156,
-  totalValue: 45280.50,
-  lowStockCount: 8,
-  categoriesStats: [
-    { category: 'vins', count: 45, value: 25600 },
-    { category: 'spiritueux', count: 23, value: 12800 },
-    { category: 'bieres', count: 35, value: 4200 },
-    { category: 'softs', count: 28, value: 1800 },
-    { category: 'jus', count: 15, value: 650 },
-    { category: 'eaux', count: 10, value: 230 },
-  ],
-  recentMovements: []
-};
-
-const mockLowStockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Château Margaux 2019',
-    category: 'vins',
-    quantity: 2,
-    unit: 'bouteille',
-    prixAchat: 180,
-    prixVente: 220,
-    seuilAlerte: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '2',
-    name: 'Hendricks Gin',
-    category: 'spiritueux',
-    quantity: 1,
-    unit: 'bouteille',
-    prixAchat: 35,
-    prixVente: 45,
-    seuilAlerte: 3,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  }
-];
+import { useStocks } from "@/hooks/useStocks";
+import { Product } from "@/types";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats>(mockStats);
-  const [lowStockProducts, setLowStockProducts] = useState<Product[]>(mockLowStockProducts);
-
-  // TODO: Remplacer par les données réelles de Firestore
-  useEffect(() => {
-    // Charger les stats du dashboard
-    // loadDashboardStats();
-  }, []);
+  const { stocks, loading, error, totalValue, lowStockCount, categoriesStats } = useStocks();
+  const { stocks: lowStockProducts } = useStocks({ onlyLowStock: true, limit: 5 });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -84,6 +33,9 @@ export default function DashboardPage() {
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'vins':
+      case 'vin-rouge':
+      case 'vin-blanc':
+      case 'vin-rose':
         return <Wine className="h-4 w-4" />;
       case 'spiritueux':
         return <Coffee className="h-4 w-4" />;
@@ -91,6 +43,29 @@ export default function DashboardPage() {
         return <Package className="h-4 w-4" />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Chargement du dashboard...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-red-600">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
+            <p>{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -128,9 +103,9 @@ export default function DashboardPage() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProducts}</div>
+            <div className="text-2xl font-bold">{stocks.length}</div>
             <p className="text-xs text-muted-foreground">
-              +12% par rapport au mois dernier
+              Produits en stock
             </p>
           </CardContent>
         </Card>
@@ -143,9 +118,9 @@ export default function DashboardPage() {
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
             <p className="text-xs text-muted-foreground">
-              +8% par rapport au mois dernier
+              Valeur totale de l'inventaire
             </p>
           </CardContent>
         </Card>
@@ -158,7 +133,7 @@ export default function DashboardPage() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{stats.lowStockCount}</div>
+            <div className="text-2xl font-bold text-orange-500">{lowStockCount}</div>
             <p className="text-xs text-muted-foreground">
               Produits nécessitant un réapprovisionnement
             </p>
@@ -168,14 +143,16 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Tendance
+              Valeur Moyenne
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">+15%</div>
+            <div className="text-2xl font-bold text-green-500">
+              {stocks.length > 0 ? formatCurrency(totalValue / stocks.length) : "0€"}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Rotation du stock ce mois
+              Par produit
             </p>
           </CardContent>
         </Card>
@@ -192,20 +169,27 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {stats.categoriesStats.map((category) => (
-                <div key={category.category} className="flex items-center justify-between">
+              {Object.entries(categoriesStats).map(([category, stats]) => (
+                <div key={category} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {getCategoryIcon(category.category)}
-                    <span className="capitalize font-medium">{category.category}</span>
+                    {getCategoryIcon(category)}
+                    <span className="capitalize font-medium">{category.replace('-', ' ')}</span>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold">{category.count} produits</div>
+                    <div className="font-bold">{stats.count} produits</div>
                     <div className="text-sm text-muted-foreground">
-                      {formatCurrency(category.value)}
+                      {formatCurrency(stats.value)}
                     </div>
                   </div>
                 </div>
               ))}
+              
+              {Object.keys(categoriesStats).length === 0 && (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Aucune catégorie disponible</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -223,17 +207,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {lowStockProducts.map((product) => (
+              {lowStockProducts.map((product: Product) => (
                 <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div>
-                    <p className="font-medium text-sm">{product.name}</p>
+                    <p className="font-medium text-sm">{product.nom}</p>
                     <p className="text-xs text-muted-foreground capitalize">
-                      {product.category}
+                      {product.categorie.replace('-', ' ')}
                     </p>
                   </div>
                   <div className="text-right">
                     <Badge variant="destructive" className="text-xs">
-                      {product.quantity} {product.unit}
+                      {product.quantite} {product.unite}
                     </Badge>
                     <p className="text-xs text-muted-foreground mt-1">
                       Min: {product.seuilAlerte}

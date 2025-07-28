@@ -6,108 +6,93 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
+  Zap, 
   Search, 
-  Minus, 
-  Plus, 
-  Zap,
+  Minus,
+  Plus,
+  Loader2,
+  AlertTriangle,
+  Package,
   Wine,
   Coffee,
-  Package,
-  CheckCircle,
-  AlertTriangle,
+  ShoppingCart,
 } from "lucide-react";
 import { Product } from "@/types";
 import { toast } from "sonner";
-
-// Mock data - sera remplacé par les données Firestore
-const mockProducts: Product[] = [
-  {
-    id: '1',
-    name: 'Château Margaux 2019',
-    category: 'vins',
-    quantity: 12,
-    unit: 'bouteille',
-    prixAchat: 180,
-    prixVente: 220,
-    prixVerre: 25,
-    seuilAlerte: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '2',
-    name: 'Hendricks Gin',
-    category: 'spiritueux',
-    quantity: 8,
-    unit: 'bouteille',
-    prixAchat: 35,
-    prixVente: 45,
-    prixVerre: 8,
-    seuilAlerte: 3,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '3',
-    name: 'Kronenbourg 1664',
-    category: 'bieres',
-    quantity: 24,
-    unit: 'bouteille',
-    prixAchat: 2.5,
-    prixVente: 4.5,
-    seuilAlerte: 10,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  },
-  {
-    id: '4',
-    name: 'Coca-Cola',
-    category: 'softs',
-    quantity: 15,
-    unit: 'cannette',
-    prixAchat: 1.2,
-    prixVente: 3,
-    seuilAlerte: 20,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    createdBy: 'user1'
-  }
-];
+import { useStocks } from "@/hooks/useStocks";
+import { StockService } from "@/lib/stockService";
 
 export default function ServicePage() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(mockProducts);
+  const { stocks, loading, error, lowStockCount } = useStocks();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [quickSellQuantities, setQuickSellQuantities] = useState<{ [key: string]: number }>({});
 
-  // Filtrer les produits selon la recherche et la catégorie
+  // Filtrer les produits
   useEffect(() => {
-    let filtered = products;
+    let filtered = stocks;
 
+    // Filtrage par recherche
     if (searchTerm) {
       filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase())
+        product.nom.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
+    // Filtrage par catégorie
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(product => product.category === selectedCategory);
+      filtered = filtered.filter(product => product.categorie === selectedCategory);
     }
 
+    // Trier par nom
+    filtered.sort((a, b) => a.nom.localeCompare(b.nom));
+
     setFilteredProducts(filtered);
-  }, [products, searchTerm, selectedCategory]);
+  }, [stocks, searchTerm, selectedCategory]);
+
+  const handleQuickSell = async (productId: string, quantity: number = 1) => {
+    try {
+      setActionLoading(productId);
+      const product = stocks.find(p => p.id === productId);
+      if (!product) return;
+
+      if (product.quantite < quantity) {
+        toast.error(`Stock insuffisant (${product.quantite} disponible)`);
+        return;
+      }
+
+      await StockService.sellProduct(productId, quantity);
+      toast.success(`${quantity} ${product.unite} vendu(s) - ${product.nom}`);
+      
+      // Reset la quantité saisie
+      setQuickSellQuantities(prev => ({ ...prev, [productId]: 1 }));
+    } catch (error) {
+      console.error("Erreur vente:", error);
+      toast.error("Erreur lors de la vente");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCustomQuantity = (productId: string, quantity: number) => {
+    setQuickSellQuantities(prev => ({ 
+      ...prev, 
+      [productId]: Math.max(1, quantity) 
+    }));
+  };
+
+  const getQuickQuantity = (productId: string): number => {
+    return quickSellQuantities[productId] || 1;
+  };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'vins':
+      case 'vin-rouge':
+      case 'vin-blanc':
+      case 'vin-rose':
         return <Wine className="h-4 w-4" />;
       case 'spiritueux':
         return <Coffee className="h-4 w-4" />;
@@ -116,68 +101,39 @@ export default function ServicePage() {
     }
   };
 
-  const handleQuantityChange = (productId: string, change: number) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-
-    const currentPending = pendingChanges[productId] || 0;
-    const newPending = currentPending + change;
-    const newQuantity = product.quantity + newPending;
-
-    // Vérifier que la nouvelle quantité n'est pas négative
-    if (newQuantity < 0) {
-      toast.error("Stock insuffisant");
-      return;
-    }
-
-    setPendingChanges(prev => ({
-      ...prev,
-      [productId]: newPending
-    }));
-  };
-
-  const applyChanges = async () => {
-    try {
-      // TODO: Appliquer les changements à Firestore
-      const updatedProducts = products.map(product => {
-        const change = pendingChanges[product.id] || 0;
-        if (change !== 0) {
-          return {
-            ...product,
-            quantity: product.quantity + change,
-            updatedAt: new Date()
-          };
-        }
-        return product;
-      });
-
-      setProducts(updatedProducts);
-      setPendingChanges({});
-      
-      const changesCount = Object.values(pendingChanges).filter(change => change !== 0).length;
-      toast.success(`${changesCount} modifications appliquées`);
-    } catch (error) {
-      console.error("Erreur lors de l'application des changements:", error);
-      toast.error("Erreur lors de la sauvegarde");
-    }
-  };
-
-  const resetChanges = () => {
-    setPendingChanges({});
-    toast.info("Modifications annulées");
-  };
-
   const categories = [
-    { value: "all", label: "Toutes catégories" },
-    { value: "vins", label: "Vins" },
-    { value: "spiritueux", label: "Spiritueux" },
-    { value: "bieres", label: "Bières" },
-    { value: "softs", label: "Softs" },
-    { value: "jus", label: "Jus" },
-    { value: "eaux", label: "Eaux" },
-  ];
+    { value: "all", label: "Tous", count: stocks.length },
+    { value: "vins", label: "Vins", count: stocks.filter(p => p.categorie === 'vins').length },
+    { value: "vin-rouge", label: "Rouges", count: stocks.filter(p => p.categorie === 'vin-rouge').length },
+    { value: "vin-blanc", label: "Blancs", count: stocks.filter(p => p.categorie === 'vin-blanc').length },
+    { value: "vin-rose", label: "Rosés", count: stocks.filter(p => p.categorie === 'vin-rose').length },
+    { value: "spiritueux", label: "Spiritueux", count: stocks.filter(p => p.categorie === 'spiritueux').length },
+    { value: "bieres", label: "Bières", count: stocks.filter(p => p.categorie === 'bieres').length },
+    { value: "softs", label: "Softs", count: stocks.filter(p => p.categorie === 'softs').length },
+  ].filter(cat => cat.count > 0);
 
-  const pendingChangesCount = Object.values(pendingChanges).filter(change => change !== 0).length;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Chargement...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-red-600">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
+            <p>{error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -185,41 +141,62 @@ export default function ServicePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Zap className="h-8 w-8 text-yellow-500" />
+            <Zap className="h-8 w-8 text-blue-500" />
             Service Rapide
           </h1>
           <p className="text-muted-foreground">
-            Gestion rapide du stock pendant le service
+            Gestion rapide des ventes et décrément de stock en direct
           </p>
         </div>
-        
-        {pendingChangesCount > 0 && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={resetChanges}>
-              Annuler ({pendingChangesCount})
-            </Button>
-            <Button onClick={applyChanges}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              Appliquer ({pendingChangesCount})
-            </Button>
-          </div>
+        {lowStockCount > 0 && (
+          <Badge variant="destructive" className="text-sm">
+            {lowStockCount} produit(s) en stock faible
+          </Badge>
         )}
       </div>
 
-      {/* Filtres */}
+      {/* Statistiques rapides */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Produits Disponibles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{filteredProducts.length}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Stock Faible</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-500">{lowStockCount}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Recherche Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{searchTerm ? "OUI" : "NON"}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recherche et Filtres */}
       <Card>
-        <CardHeader>
-          <CardTitle>Filtres</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4 md:flex-row">
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher un produit..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                className="pl-9 text-lg"
+                autoFocus
               />
             </div>
             
@@ -230,8 +207,12 @@ export default function ServicePage() {
                   variant={selectedCategory === category.value ? "default" : "outline"}
                   size="sm"
                   onClick={() => setSelectedCategory(category.value)}
+                  className="flex items-center gap-1"
                 >
                   {category.label}
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {category.count}
+                  </Badge>
                 </Button>
               ))}
             </div>
@@ -239,110 +220,158 @@ export default function ServicePage() {
         </CardContent>
       </Card>
 
-      {/* Liste des produits */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Grille des produits */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredProducts.map((product) => {
-          const pendingChange = pendingChanges[product.id] || 0;
-          const newQuantity = product.quantity + pendingChange;
-          const isLowStock = newQuantity <= product.seuilAlerte;
+          const isLowStock = product.quantite <= product.seuilAlerte;
+          const quickQty = getQuickQuantity(product.id);
+          const isLoading = actionLoading === product.id;
           
           return (
-            <Card key={product.id} className={`transition-all ${pendingChange !== 0 ? 'ring-2 ring-primary' : ''}`}>
+            <Card key={product.id} className={`relative ${isLowStock ? 'border-orange-500' : ''}`}>
+              {isLowStock && (
+                <div className="absolute top-2 right-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                </div>
+              )}
+              
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    {getCategoryIcon(product.category)}
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
+                <div className="flex items-start gap-2">
+                  {getCategoryIcon(product.categorie)}
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-sm font-medium truncate">
+                      {product.nom}
+                    </CardTitle>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {product.categorie.replace('-', ' ')}
+                      </Badge>
+                      <span className={`text-xs font-medium ${isLowStock ? 'text-orange-500' : ''}`}>
+                        {product.quantite} {product.unite}
+                      </span>
+                    </div>
                   </div>
-                  <Badge variant={isLowStock ? "destructive" : "secondary"} className="text-xs">
-                    {product.category}
-                  </Badge>
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-4">
-                {/* Stock actuel */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Stock:</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold ${isLowStock ? 'text-red-500' : ''}`}>
-                      {newQuantity} {product.unit}
-                    </span>
-                    {isLowStock && <AlertTriangle className="h-4 w-4 text-red-500" />}
-                  </div>
-                </div>
-
-                {/* Changement en cours */}
-                {pendingChange !== 0 && (
-                  <div className="flex items-center justify-between p-2 bg-muted rounded">
-                    <span className="text-sm">Changement:</span>
-                    <span className={`font-bold ${pendingChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                      {pendingChange > 0 ? '+' : ''}{pendingChange}
-                    </span>
-                  </div>
-                )}
-
+              <CardContent className="space-y-3">
                 {/* Prix */}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Prix vente:</span>
-                  <span className="font-medium">
-                    {product.prixVente.toFixed(2)}€
-                    {product.prixVerre && ` / ${product.prixVerre.toFixed(2)}€ verre`}
-                  </span>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Vente:</span>
+                    <div className="font-medium">
+                      {new Intl.NumberFormat('fr-FR', {
+                        style: 'currency',
+                        currency: 'EUR',
+                      }).format(product.prixVente)}
+                    </div>
+                  </div>
+                  {product.prixVerre && (
+                    <div>
+                      <span className="text-muted-foreground">Verre:</span>
+                      <div className="font-medium">
+                        {new Intl.NumberFormat('fr-FR', {
+                          style: 'currency',
+                          currency: 'EUR',
+                        }).format(product.prixVerre)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Contrôles de quantité */}
-                <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleQuantityChange(product.id, -1)}
-                    disabled={newQuantity <= 0}
+                    onClick={() => handleCustomQuantity(product.id, quickQty - 1)}
+                    disabled={quickQty <= 1}
+                    className="h-8 w-8 p-0"
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-3 w-3" />
                   </Button>
                   
-                  <div className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuantityChange(product.id, -5)}
-                      disabled={newQuantity < 5}
-                    >
-                      -5
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleQuantityChange(product.id, -10)}
-                      disabled={newQuantity < 10}
-                    >
-                      -10
-                    </Button>
-                  </div>
+                  <Input
+                    type="number"
+                    min="1"
+                    max={product.quantite}
+                    value={quickQty}
+                    onChange={(e) => handleCustomQuantity(product.id, parseInt(e.target.value) || 1)}
+                    className="h-8 text-center"
+                  />
                   
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleQuantityChange(product.id, 1)}
+                    onClick={() => handleCustomQuantity(product.id, quickQty + 1)}
+                    disabled={quickQty >= product.quantite}
+                    className="h-8 w-8 p-0"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3" />
                   </Button>
                 </div>
+
+                {/* Bouton de vente */}
+                <Button
+                  onClick={() => handleQuickSell(product.id, quickQty)}
+                  disabled={isLoading || product.quantite < quickQty}
+                  className="w-full"
+                  variant={isLowStock ? "destructive" : "default"}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                  )}
+                  Vendre {quickQty} {product.unite}
+                  {quickQty > 1 && "s"}
+                </Button>
+
+                {/* Boutons rapides pour les vins */}
+                {(product.categorie.includes('vin') || product.categorie === 'spiritueux') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuickSell(product.id, 1)}
+                      disabled={isLoading || product.quantite < 1}
+                      className="text-xs"
+                    >
+                      Verre
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleQuickSell(product.id, 1)}
+                      disabled={isLoading || product.quantite < 1}
+                      className="text-xs"
+                    >
+                      Bouteille
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
 
+      {/* Message si aucun produit */}
       {filteredProducts.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <h3 className="text-lg font-semibold mb-2">Aucun produit trouvé</h3>
-          <p className="text-muted-foreground">
-            Essayez de modifier vos critères de recherche
-          </p>
-        </div>
+        <Card>
+          <CardContent className="pt-12 pb-12">
+            <div className="text-center">
+              <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">Aucun produit trouvé</h3>
+              <p className="text-muted-foreground">
+                {searchTerm 
+                  ? `Aucun produit ne correspond à "${searchTerm}"`
+                  : "Aucun produit disponible dans cette catégorie"
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
