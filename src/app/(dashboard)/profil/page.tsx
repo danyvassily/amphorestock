@@ -226,7 +226,7 @@ export default function ProfilPage() {
                           />
                         </FormControl>
                         <FormDescription>
-                          L'email ne peut pas être modifié
+                          L&apos;email ne peut pas être modifié
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

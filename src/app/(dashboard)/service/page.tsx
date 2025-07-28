@@ -420,7 +420,7 @@ export default function ServicePage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Chiffre d'Affaires</CardTitle>
+              <CardTitle className="text-sm font-medium">Chiffre d&apos;Affaires</CardTitle>
               <DollarSign className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
@@ -715,7 +715,7 @@ export default function ServicePage() {
                   <TableHead>Produit</TableHead>
                   <TableHead>Catégorie</TableHead>
                   <TableHead>Stock Actuel</TableHead>
-                  <TableHead>Seuil d'Alerte</TableHead>
+                  <TableHead>Seuil d&apos;Alerte</TableHead>
                   <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>

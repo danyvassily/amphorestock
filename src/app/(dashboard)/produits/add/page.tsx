@@ -98,7 +98,7 @@ export default function AddProductPage() {
         description: data.description,
         fournisseur: data.fournisseur,
         seuilAlerte: data.seuilAlerte,
-        source: data.category === 'vins' || data.category === 'vin-rouge' || data.category === 'vin-blanc' || data.category === 'vin-rose' ? 'vins' : 'boissons',
+        source: (data.category as string).includes('vin') ? 'vins' : 'boissons',
         isActive: data.isActive,
         createdBy: user?.uid || 'anonymous',
       };
@@ -306,7 +306,7 @@ export default function AddProductPage() {
                   name="seuilAlerte"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Seuil d'alerte *</FormLabel>
+                      <FormLabel>Seuil d&apos;alerte *</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -329,7 +329,7 @@ export default function AddProductPage() {
                   name="prixAchat"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Prix d'achat (€) *</FormLabel>
+                      <FormLabel>Prix d&apos;achat (€) *</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 

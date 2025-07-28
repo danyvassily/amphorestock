@@ -146,7 +146,7 @@ export default function AIPage() {
       const result = await AIService.processUploadedFile(selectedFile, user?.uid || 'anonymous');
       
       if (result.success) {
-        toast.success(`Fichier traité avec succès: ${result.fileName}`);
+        toast.success("Fichier traité avec succès par l'IA !");
         setSelectedFile(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
@@ -155,9 +155,9 @@ export default function AIPage() {
         // Ajouter la réponse du traitement
         const aiResponse: AIResponse & { prompt: string } = {
           success: true,
-          response: `Fichier "${result.fileName}" traité avec succès. ${result.processedData ? 'Données extraites et formatées.' : ''}`,
+          response: `Fichier traité avec succès par l'IA. ${result.response || 'Données extraites et formatées.'}`,
           timestamp: new Date().toISOString(),
-          prompt: `Import du fichier: ${result.fileName}`
+          prompt: `Import de fichier via IA`
         };
         setResponses(prev => [aiResponse, ...prev]);
       } else {
@@ -219,7 +219,7 @@ export default function AIPage() {
         <div>
           <h1 className="text-3xl font-bold">Intelligence Artificielle</h1>
           <p className="text-muted-foreground">
-            Analysez, optimisez et gérez votre stock avec l'aide de l'IA Gemini
+            Analysez, optimisez et gérez votre stock avec l&apos;aide de l&apos;IA Gemini
           </p>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function AIPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5" />
-                Poser une question à l'IA
+                Poser une question à l&apos;IA
               </CardTitle>
               <CardDescription>
                 Décrivez ce que vous souhaitez analyser ou demandez des recommandations
@@ -288,7 +288,7 @@ export default function AIPage() {
                 Import intelligent de fichier
               </CardTitle>
               <CardDescription>
-                Uploadez un fichier Excel/CSV pour traitement automatique par l'IA
+                Uploadez un fichier Excel/CSV pour traitement automatique par l&apos;IA
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -343,7 +343,7 @@ export default function AIPage() {
                     ) : (
                       <Brain className="h-4 w-4 mr-2" />
                     )}
-                    Traiter avec l'IA
+                    Traiter avec l&apos;IA
                   </Button>
                 </div>
               </div>
@@ -414,30 +414,30 @@ export default function AIPage() {
             <CardHeader>
               <CardTitle>Actions rapides</CardTitle>
               <CardDescription>
-                Cliquez sur une action pour l'exécuter directement
+                Cliquez sur une action pour l&apos;exécuter directement
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {presetPrompts.map((preset) => (
                 <Button
-                  key={preset.id}
+                  key={preset.title}
                   variant="outline"
                   className="w-full justify-start h-auto p-3"
-                  onClick={() => handlePresetClick(preset)}
+                  onClick={() => handlePresetClick(preset as unknown as PresetPrompt)}
                   disabled={isLoading}
                 >
                   <div className="flex items-start gap-3 text-left">
-                    <span className="text-lg">{preset.icon}</span>
+                    <span className="text-lg">{(preset as any).icon || '🤖'}</span>
                     <div className="space-y-1">
                       <p className="font-medium text-sm">{preset.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {preset.description}
+                        {(preset as any).description || preset.prompt}
                       </p>
                       <Badge 
                         variant="outline" 
                         className={`text-xs ${getCategoryColor(preset.category)}`}
                       >
-                        {getCategoryIcon(preset.category)} {preset.category}
+                        {getCategoryIcon(preset.category)} {preset.category || 'general'}
                       </Badge>
                     </div>
                   </div>
@@ -457,7 +457,7 @@ export default function AIPage() {
               <p>• Toutes les requêtes sont loggées</p>
               <p>• Les modifications nécessitent confirmation</p>
               <p>• Vos données restent privées</p>
-              <p>• L'IA n'a accès qu'aux données nécessaires</p>
+              <p>• L&apos;IA n&apos;a accès qu&apos;aux données nécessaires</p>
             </CardContent>
           </Card>
         </div>
@@ -467,7 +467,7 @@ export default function AIPage() {
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmer l'action IA</DialogTitle>
+            <DialogTitle>Confirmer l&apos;action IA</DialogTitle>
             <DialogDescription>
               Cette action va analyser vos données et peut proposer des modifications.
               Voulez-vous continuer ?

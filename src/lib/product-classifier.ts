@@ -158,6 +158,6 @@ export function getCategoryLabel(category: ProductCategory): string {
     case 'eaux': return 'Eaux';
     case 'cocktails': return 'Cocktails';
     case 'autres': return 'Autres';
-    default: return category.charAt(0).toUpperCase() + category.slice(1);
+    default: return String(category).charAt(0).toUpperCase() + String(category).slice(1);
   }
 } 

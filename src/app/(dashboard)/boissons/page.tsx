@@ -337,7 +337,7 @@ export default function BoissonsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(getTotalValue())}</div>
             <p className="text-xs text-muted-foreground">
-              valeur d'achat
+              valeur d&apos;achat
             </p>
           </CardContent>
         </Card>

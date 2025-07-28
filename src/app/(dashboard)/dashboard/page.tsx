@@ -74,7 +74,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">
-            Vue d'ensemble de votre stock et de vos ventes
+            Vue d&apos;ensemble de votre stock et de vos ventes
           </p>
         </div>
         <div className="flex gap-2">
@@ -120,7 +120,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
             <p className="text-xs text-muted-foreground">
-              Valeur totale de l'inventaire
+              Valeur totale de l&apos;inventaire
             </p>
           </CardContent>
         </Card>

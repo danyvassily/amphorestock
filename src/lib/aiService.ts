@@ -266,7 +266,7 @@ export class AIService {
             ...doc.data(),
             createdAt: doc.data().createdAt?.toDate() || new Date(),
           }))
-          .filter(mov => mov.type === 'sortie') as StockMovement[];
+          .filter(mov => (mov as any).type === 'sortie') as StockMovement[];
       } catch (movError) {
         console.warn('Erreur lors de la récupération des ventes:', movError);
       }

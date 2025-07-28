@@ -129,7 +129,7 @@ export default function ImportAIPage() {
           setSelectedFiles([]);
           loadImportHistory();
         } else {
-          toast.error(result.error || 'Erreur lors de l\'import automatique');
+          toast.error(result.error || "Erreur lors de l'import automatique");
         }
       } else {
         // Mode aperçu standard
@@ -148,12 +148,12 @@ export default function ImportAIPage() {
         setImportPreview(preview);
         setShowPreview(true);
         setProcessingProgress(100);
-        toast.success('Analyse IA terminée ! Vérifiez l\'aperçu.');
+        toast.success("Analyse IA terminée ! Vérifiez l'aperçu.");
       }
 
     } catch (error) {
       console.error('Erreur lors du traitement:', error);
-      toast.error(autoImportEnabled ? 'Erreur lors de l\'import automatique' : 'Erreur lors de l\'analyse IA');
+              toast.error(autoImportEnabled ? "Erreur lors de l'import automatique" : "Erreur lors de l'analyse IA");
     } finally {
       setIsProcessing(false);
       setProcessingStep('');
@@ -186,7 +186,7 @@ export default function ImportAIPage() {
           setTextInput('');
           loadImportHistory();
         } else {
-          toast.error(result.error || 'Erreur lors de l\'import automatique');
+          toast.error(result.error || "Erreur lors de l'import automatique");
         }
       } else {
         // Mode aperçu standard
@@ -197,10 +197,10 @@ export default function ImportAIPage() {
         
         setImportPreview(preview);
         setShowPreview(true);
-        toast.success('Texte analysé par l\'IA !');
+        toast.success("Texte analysé par l'IA !");
       }
     } catch (error) {
-      toast.error(autoImportEnabled ? 'Erreur lors de l\'import automatique' : 'Erreur lors de l\'analyse du texte');
+      toast.error(autoImportEnabled ? "Erreur lors de l'import automatique" : "Erreur lors de l'analyse du texte");
     } finally {
       setIsProcessing(false);
     }
@@ -315,7 +315,7 @@ export default function ImportAIPage() {
           <div>
             <h1 className="text-3xl font-bold">Import IA Intelligent</h1>
             <p className="text-muted-foreground">
-              Importez vos stocks avec l'aide de l'intelligence artificielle
+                              Importez vos stocks avec l&apos;aide de l&apos;intelligence artificielle
             </p>
           </div>
         </div>
@@ -354,7 +354,7 @@ export default function ImportAIPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <Upload className="h-4 w-4 text-blue-500" />
-              <span className="text-sm font-medium">Imports aujourd'hui</span>
+              <span className="text-sm font-medium">Imports aujourd&apos;hui</span>
             </div>
             <p className="text-2xl font-bold">
               {importHistory.filter(h => 
@@ -470,7 +470,7 @@ export default function ImportAIPage() {
                   multiple
                   onChange={handleFileSelect}
                   className="hidden"
-                  aria-label="Sélectionner des fichiers à importer avec l'IA"
+                                        aria-label="Sélectionner des fichiers à importer avec l&apos;IA"
                 />
 
                 {/* Fichiers sélectionnés */}
@@ -550,7 +550,7 @@ export default function ImportAIPage() {
                 Import par texte ou dictée vocale
               </CardTitle>
               <CardDescription>
-                Tapez ou dictez votre inventaire, l'IA le structurera automatiquement
+                                    Tapez ou dictez votre inventaire, l&apos;IA le structurera automatiquement
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -606,7 +606,7 @@ export default function ImportAIPage() {
                     <Mic className="h-4 w-4" />
                     <AlertTitle>Reconnaissance vocale active</AlertTitle>
                     <AlertDescription>
-                      Parlez clairement. La reconnaissance s'arrêtera automatiquement après une pause.
+                      Parlez clairement. La reconnaissance s&apos;arrêtera automatiquement après une pause.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -625,7 +625,7 @@ export default function ImportAIPage() {
                   Import Automatique
                 </CardTitle>
                 <CardDescription>
-                  L'IA importe directement sans aperçu si la confiance est suffisante
+                                        L&apos;IA importe directement sans aperçu si la confiance est suffisante
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -643,7 +643,7 @@ export default function ImportAIPage() {
                       checked={autoImportEnabled}
                       onChange={(e) => setAutoImportEnabled(e.target.checked)}
                       className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                      aria-label="Activer l'import automatique"
+                                              aria-label="Activer l&apos;import automatique"
                     />
                   </div>
 
@@ -717,7 +717,7 @@ export default function ImportAIPage() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Permissions actuelles</AlertTitle>
                     <AlertDescription>
-                      Vous avez les droits d'import complets. Tous les imports sont loggés.
+                      Vous avez les droits d&apos;import complets. Tous les imports sont loggés.
                     </AlertDescription>
                   </Alert>
                   
@@ -733,7 +733,7 @@ export default function ImportAIPage() {
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>Import automatique activé</AlertTitle>
                       <AlertDescription>
-                        Les données seront importées directement. Vérifiez régulièrement l'historique.
+                        Les données seront importées directement. Vérifiez régulièrement l&apos;historique.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -788,10 +788,10 @@ export default function ImportAIPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
-              Aperçu de l'import IA
+              Aperçu de l&apos;import IA
             </DialogTitle>
             <DialogDescription>
-              Vérifiez les données analysées par l'IA avant validation
+                              Vérifiez les données analysées par l&apos;IA avant validation
             </DialogDescription>
           </DialogHeader>
           
@@ -909,7 +909,7 @@ export default function ImportAIPage() {
             </Button>
             <Button onClick={validateImport} className="bg-green-600 hover:bg-green-700">
               <Save className="h-4 w-4 mr-2" />
-              Valider l'import
+                              Valider l&apos;import
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -924,7 +924,7 @@ export default function ImportAIPage() {
               Historique des imports
             </DialogTitle>
             <DialogDescription>
-              Consultez l'historique complet de vos imports IA
+                              Consultez l&apos;historique complet de vos imports IA
             </DialogDescription>
           </DialogHeader>
           

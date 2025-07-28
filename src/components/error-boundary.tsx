@@ -61,7 +61,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 Oops ! Une erreur est survenue
               </CardTitle>
               <CardDescription>
-                L'application a rencontré un problème inattendu. 
+                L&apos;application a rencontré un problème inattendu. 
                 Veuillez réessayer ou rafraîchir la page.
               </CardDescription>
             </CardHeader>
@@ -69,7 +69,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md">
                   <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-                    Détails de l'erreur (développement):
+                    Détails de l&apos;erreur (développement):
                   </p>
                   <p className="text-xs text-red-600 dark:text-red-400 font-mono break-all">
                     {this.state.error.message}

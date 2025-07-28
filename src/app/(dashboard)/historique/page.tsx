@@ -262,7 +262,7 @@ export default function HistoriquePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Historique & Rapports</h1>
           <p className="text-muted-foreground">
-            Suivi détaillé des mouvements de stock et analyses d'activité
+            Suivi détaillé des mouvements de stock et analyses d&apos;activité
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -395,7 +395,7 @@ export default function HistoriquePage() {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name} ${percent ? (percent * 100).toFixed(0) : 0}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"

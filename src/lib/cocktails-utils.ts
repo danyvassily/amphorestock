@@ -113,7 +113,7 @@ function analyzeCocktailMatch(
   // Calcul du score de correspondance
   const baseScore = (availableCount / allIngredients.length) * 100;
   const requiredScore = requiredIngredients.every(ing => 
-    findMatchingProduct(ing, availableProducts)?.quantite > 0
+    (findMatchingProduct(ing, availableProducts)?.quantite || 0) > 0
   ) ? 100 : (availableCount / requiredIngredients.length) * 70;
 
   const matchScore = Math.max(baseScore, requiredScore);

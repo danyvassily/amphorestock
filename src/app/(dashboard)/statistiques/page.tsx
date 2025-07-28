@@ -182,7 +182,7 @@ export default function StatisticsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Statistiques & Analytics</h1>
           <p className="text-muted-foreground">
-            Analyse détaillée des performances et tendances de l'établissement
+            Analyse détaillée des performances et tendances de l&apos;établissement
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -208,7 +208,7 @@ export default function StatisticsPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Chiffre d'Affaires</CardTitle>
+            <CardTitle className="text-sm font-medium">Chiffre d&apos;Affaires</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -262,7 +262,7 @@ export default function StatisticsPage() {
           <CardHeader>
             <CardTitle className="flex items-center">
               <BarChart3 className="mr-2 h-5 w-5" />
-              Évolution du Chiffre d'Affaires
+              Évolution du Chiffre d&apos;Affaires
             </CardTitle>
             <CardDescription>
               Comparaison service midi vs soir sur 30 jours
@@ -298,7 +298,7 @@ export default function StatisticsPage() {
               Répartition Horaire des Ventes
             </CardTitle>
             <CardDescription>
-              Pic d'activité par tranche horaire
+              Pic d&apos;activité par tranche horaire
             </CardDescription>
           </CardHeader>
           <CardContent>

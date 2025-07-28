@@ -6,7 +6,7 @@
  * vers la base de données Firestore.
  */
 
-import { collection, addDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { Product, ProductCategory, ProductUnit } from '@/types';
 
@@ -136,17 +136,18 @@ export function excelVinToProduct(
   createdBy: string
 ): Omit<Product, 'id'> {
   return {
-    name: vinData.nom.trim(),
-    category: normalizeCategory(vinData.categorie),
+    nom: vinData.nom.trim(),
+    categorie: normalizeCategory(vinData.categorie),
     subcategory: vinData.region || undefined,
-    quantity: Math.max(0, vinData.quantite || 0),
-    unit: normalizeUnit(vinData.unite),
+    quantite: Math.max(0, vinData.quantite || 0),
+    unite: normalizeUnit(vinData.unite),
     prixAchat: Math.max(0, vinData.prixAchat || 0),
     prixVente: Math.max(0, vinData.prixVente || 0),
     prixVerre: vinData.prixVerre && vinData.prixVerre > 0 ? vinData.prixVerre : undefined,
     description: vinData.description || `${vinData.nom}${vinData.annee ? ` ${vinData.annee}` : ''}`,
     fournisseur: vinData.fournisseur || undefined,
     seuilAlerte: 5, // Valeur par défaut pour les vins
+    source: 'vins',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -162,11 +163,11 @@ export function excelBoissonToProduct(
   createdBy: string
 ): Omit<Product, 'id'> {
   return {
-    name: boissonData.nom.trim(),
-    category: normalizeCategory(boissonData.categorie),
+    nom: boissonData.nom.trim(),
+    categorie: normalizeCategory(boissonData.categorie),
     subcategory: boissonData.marque || undefined,
-    quantity: Math.max(0, boissonData.quantite || 0),
-    unit: normalizeUnit(boissonData.unite),
+    quantite: Math.max(0, boissonData.quantite || 0),
+    unite: normalizeUnit(boissonData.unite),
     prixAchat: Math.max(0, boissonData.prixAchat || 0),
     prixVente: Math.max(0, boissonData.prixVente || 0),
     description: boissonData.contenance ? 
@@ -174,6 +175,7 @@ export function excelBoissonToProduct(
       boissonData.nom,
     fournisseur: boissonData.fournisseur || undefined,
     seuilAlerte: Math.max(0, boissonData.seuilAlerte || 10),
+    source: 'boissons',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -198,7 +200,7 @@ export async function importProductsToFirestore(
     
     try {
       currentBatch.forEach((product) => {
-        const docRef = collection(db, 'products');
+        const docRef = doc(collection(db, 'products'));
         batch.set(docRef, product);
       });
       

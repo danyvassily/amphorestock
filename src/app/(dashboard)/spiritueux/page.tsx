@@ -285,7 +285,7 @@ export default function SpiriteuxPage() {
             Bar à Spiritueux
           </h1>
           <p className="text-muted-foreground">
-            Collection complète d'alcools forts ({spiritueux.length} spiritueux)
+            Collection complète d&apos;alcools forts ({spiritueux.length} spiritueux)
           </p>
         </div>
         <div className="flex gap-2">
@@ -337,7 +337,7 @@ export default function SpiriteuxPage() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(getTotalValue())}</div>
             <p className="text-xs text-muted-foreground">
-              valeur d'achat
+              valeur d&apos;achat
             </p>
           </CardContent>
         </Card>
