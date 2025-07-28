@@ -119,6 +119,7 @@ export default function ServicePage() {
   
   // États des dialogues
   const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
+  const [isAlertsDialogOpen, setIsAlertsDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sellQuantity, setSellQuantity] = useState(1);
   const [tableNumber, setTableNumber] = useState("");
@@ -328,6 +329,13 @@ export default function ServicePage() {
   const getCurrentTimeCategory = (): 'midi' | 'soir' => {
     const hour = new Date().getHours();
     return hour >= 11 && hour <= 15 ? 'midi' : 'soir';
+  };
+
+  // Fonction pour obtenir les produits en stock faible
+  const getLowStockProducts = () => {
+    return stocks.filter(product => 
+      product.isActive && product.quantite <= product.seuilAlerte
+    );
   };
 
   return (
@@ -687,6 +695,92 @@ export default function ServicePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialogue des alertes de stock */}
+      <Dialog open={isAlertsDialogOpen} onOpenChange={setIsAlertsDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center text-orange-600">
+              <AlertCircle className="mr-2 h-5 w-5" />
+              Alertes de Stock Faible
+            </DialogTitle>
+            <DialogDescription>
+              Liste des produits nécessitant un réapprovisionnement
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-96 overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Produit</TableHead>
+                  <TableHead>Catégorie</TableHead>
+                  <TableHead>Stock Actuel</TableHead>
+                  <TableHead>Seuil d'Alerte</TableHead>
+                  <TableHead>Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {getLowStockProducts().map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      <div className="font-medium">{product.nom}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {product.unite}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        {getCategoryIcon(product.categorie)}
+                        <Badge 
+                          variant="outline" 
+                          className={`${getCategoryColor(product.categorie)} border capitalize`}
+                        >
+                          {getCategoryLabel(product.categorie)}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center text-red-600 font-medium">
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        {product.quantite} {product.unite}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground">
+                        {product.seuilAlerte} {product.unite}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                      >
+                        <Truck className="mr-2 h-4 w-4" />
+                        Réapprovisionner
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            {getLowStockProducts().length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Check className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                <p>Aucune alerte de stock ! Tous les produits sont bien approvisionnés.</p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAlertsDialogOpen(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Alertes de stock faible */}
       {lowStockCount > 0 && (
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
@@ -699,7 +793,11 @@ export default function ServicePage() {
           <CardContent>
             <p className="text-orange-700 dark:text-orange-300">
               {lowStockCount} produit(s) ont un stock faible. 
-              <Button variant="link" className="text-orange-600 p-0 ml-1">
+              <Button 
+                variant="link" 
+                className="text-orange-600 p-0 ml-1"
+                onClick={() => setIsAlertsDialogOpen(true)}
+              >
                 Voir les alertes
               </Button>
             </p>

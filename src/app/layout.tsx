@@ -27,10 +27,17 @@ export default function RootLayout({
   return (
     <html lang="fr" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground flex flex-col`}
       >
         <ErrorBoundary>
-          {children}
+          <div className="flex-1">
+            {children}
+          </div>
+          <footer className="py-2 px-4 text-center">
+            <p className="text-xs text-muted-foreground/50">
+              Dany-Steven Manfoumbi Vassiliakos
+            </p>
+          </footer>
           <Toaster />
         </ErrorBoundary>
       </body>
