@@ -1,0 +1,317 @@
+{
+  "name": "SaaS Stock Management - Automated File Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-upload",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "stock-upload-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "file-type-check",
+              "leftValue": "={{ $json.file.type }}",
+              "rightValue": "text/csv",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "file-type-router",
+      "name": "File Type Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "filePath": "={{ $json.file.path }}",
+        "options": {}
+      },
+      "id": "csv-reader",
+      "name": "CSV Reader",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "filePath": "={{ $json.file.path }}",
+        "options": {}
+      },
+      "id": "excel-reader",
+      "name": "Excel Reader",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "filePath": "={{ $json.file.path }}",
+        "options": {}
+      },
+      "id": "pdf-reader",
+      "name": "PDF Reader",
+      "type": "n8n-nodes-base.readBinaryFile",
+      "typeVersion": 1,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliser les données extraites\nconst data = $input.all();\nconst normalizedData = [];\n\nfor (const item of data) {\n  if (item.json && item.json.data) {\n    const rows = item.json.data;\n    \n    for (const row of rows) {\n      if (row.length >= 3) {\n        normalizedData.push({\n          nom: row[0] || '',\n          quantite: parseFloat(row[1]) || 0,\n          prixAchat: parseFloat(row[2]) || 0,\n          categorie: row[3] || 'vins-rouge',\n          unite: row[4] || 'bouteille',\n          fournisseur: row[5] || '',\n          source: 'n8n-import'\n        });\n      }\n    }\n  }\n}\n\nreturn normalizedData.map(item => ({ json: item }));"
+      },
+      "id": "data-normalizer",
+      "name": "Data Normalizer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://your-saas-domain.com/api/gemini",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.userToken }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "prompt",
+              "value": "Tu es un expert en structuration de données pour un système de gestion de stock de bar/restaurant. Analyse ces données et extrait les produits au format JSON: {{ $json.data }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "action",
+              "value": "import_parse"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ai-processor",
+      "name": "AI Processor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://your-saas-domain.com/api/webhook/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.userToken }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "processedData",
+              "value": "={{ $json }}"
+            },
+            {
+              "name": "userId",
+              "value": "={{ $json.userId }}"
+            },
+            {
+              "name": "importId",
+              "value": "={{ $json.importId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "firestore-saver",
+      "name": "Firestore Saver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Import traité avec succès\",\n  \"data\": {\n    \"processedItems\": {{ $json.processedItems }},\n    \"importId\": \"{{ $json.importId }}\",\n    \"timestamp\": \"{{ new Date().toISOString() }}\"\n  }\n}"
+      },
+      "id": "response-node",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gestion des erreurs\nconst error = $input.first().json.error;\n\nreturn [{\n  json: {\n    success: false,\n    error: error || 'Erreur lors du traitement',\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "File Type Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Type Router": {
+      "main": [
+        [
+          {
+            "node": "CSV Reader",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Excel Reader",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF Reader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CSV Reader": {
+      "main": [
+        [
+          {
+            "node": "Data Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Excel Reader": {
+      "main": [
+        [
+          {
+            "node": "Data Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF Reader": {
+      "main": [
+        [
+          {
+            "node": "Data Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Normalizer": {
+      "main": [
+        [
+          {
+            "node": "AI Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Processor": {
+      "main": [
+        [
+          {
+            "node": "Firestore Saver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Firestore Saver": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z",
+      "id": "stock-management",
+      "name": "Stock Management"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-15T10:00:00.000Z",
+  "versionId": "1"
+}
