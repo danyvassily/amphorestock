@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Wine, Eye, EyeOff } from "lucide-react";
@@ -64,7 +64,7 @@ export default function LoginPage() {
       await signIn(data.email, data.password);
       toast.success("Connexion réussie !");
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erreur de connexion:", error);
       toast.error("Erreur de connexion. Vérifiez vos identifiants.");
     } finally {
@@ -78,7 +78,7 @@ export default function LoginPage() {
       await signUp(data.email, data.password, data.displayName);
       toast.success("Compte créé avec succès !");
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erreur d'inscription:", error);
       toast.error("Erreur lors de la création du compte.");
     } finally {
@@ -92,7 +92,7 @@ export default function LoginPage() {
       await signInWithGoogle();
       toast.success("Connexion Google réussie !");
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erreur Google:", error);
       toast.error("Erreur de connexion avec Google.");
     } finally {

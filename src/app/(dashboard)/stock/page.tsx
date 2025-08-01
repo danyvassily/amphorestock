@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { useGeneralStock } from '@/hooks/useModernProducts';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+// import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Table,
   TableBody,
@@ -24,15 +24,12 @@ import {
   Edit,
   Trash2,
   AlertTriangle,
-  TrendingUp,
-  TrendingDown,
   Wifi,
   WifiOff,
   Clock,
   ArrowUpDown,
   Euro,
-  BarChart3,
-  ShoppingCart
+  BarChart3
 } from 'lucide-react';
 import { Product, ProductFormData } from '@/types';
 import Link from 'next/link';
@@ -68,9 +65,9 @@ export default function StockPage() {
     clearError
   } = useGeneralStock({
     search: searchTerm,
-    category: categoryFilter === 'all' ? undefined : categoryFilter as any,
-    stockStatus: stockStatusFilter === 'all' ? undefined : stockStatusFilter as any,
-    sortBy: sortBy as any,
+    category: categoryFilter === 'all' ? undefined : categoryFilter,
+    stockStatus: stockStatusFilter === 'all' ? undefined : stockStatusFilter,
+    sortBy: sortBy,
     sortOrder: sortDirection
   });
 
