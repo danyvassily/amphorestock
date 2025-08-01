@@ -9,7 +9,8 @@
     "lint": "next lint",
     "import-stocks": "npx tsx scripts/importStocks.ts",
     "clean-firebase": "npx tsx scripts/cleanFirebase.ts",
-    "new-import": "npx tsx scripts/newImportStocks.ts"
+    "new-import": "npx tsx scripts/newImportStocks.ts",
+    "test-firebase": "npx tsx scripts/testFirebaseConnection.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.0",

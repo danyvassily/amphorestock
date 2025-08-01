@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGeneralStock } from '@/hooks/useModernProducts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 export default function StockPage() {
+  const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatusFilter, setStockStatusFilter] = useState('all');
@@ -46,6 +47,11 @@ export default function StockPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Éviter les problèmes d'hydratation
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Utiliser le hook moderne pour le stock général
   const {
@@ -67,6 +73,17 @@ export default function StockPage() {
     sortBy: sortBy as any,
     sortOrder: sortDirection
   });
+
+  // Debug logs
+  React.useEffect(() => {
+    console.log('📦 StockPage State:', {
+      mounted,
+      loading,
+      stockCount: stockGeneral.length,
+      error,
+      connectionStatus
+    });
+  }, [mounted, loading, stockGeneral.length, error, connectionStatus]);
 
   // Statistiques du stock général
   const stockStats = useMemo(() => ({
@@ -150,6 +167,12 @@ export default function StockPage() {
       case 'eaux': return '💧';
       default: return '📦';
     }
+  };
+
+  // Fonction pour formater les prix avec 2 décimales
+  const formatPrice = (price?: number): string => {
+    if (!price && price !== 0) return '0.00';
+    return price.toFixed(2);
   };
 
   const handleSort = (field: string) => {
@@ -296,6 +319,20 @@ export default function StockPage() {
     );
   };
 
+  // Éviter les problèmes d'hydratation
+  if (!mounted) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Initialisation...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -432,7 +469,7 @@ export default function StockPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Valeur totale</p>
-                <p className="text-2xl font-bold">{stockStats.valeurTotale.toFixed(2)}€</p>
+                <p className="text-2xl font-bold">{formatPrice(stockStats.valeurTotale)}€</p>
               </div>
               <Euro className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -560,9 +597,9 @@ export default function StockPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="font-medium">{product.prixVente.toFixed(2)}€</div>
+                        <div className="font-medium">{formatPrice(product.prixVente)}€</div>
                         <div className="text-sm text-muted-foreground">
-                          Achat: {product.prixAchat.toFixed(2)}€
+                          Achat: {formatPrice(product.prixAchat)}€
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

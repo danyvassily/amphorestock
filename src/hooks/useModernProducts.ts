@@ -50,14 +50,17 @@ export function useModernProducts(filters?: FilterOptions) {
 
         // Timeout pour détecter les problèmes de connexion
         const connectionTimeout = setTimeout(() => {
-          if (loading) {
-            setConnectionStatus({
-              isConnected: false,
-              lastSync: null,
-              error: 'Timeout de connexion',
-            });
-          }
-        }, 10000);
+          setConnectionStatus(prev => {
+            if (!prev.isConnected) {
+              return {
+                isConnected: false,
+                lastSync: null,
+                error: 'Timeout de connexion - Vérifiez votre connexion Firebase',
+              };
+            }
+            return prev;
+          });
+        }, 5000);
 
         return () => clearTimeout(connectionTimeout);
       } catch (err) {
@@ -78,7 +81,7 @@ export function useModernProducts(filters?: FilterOptions) {
         unsubscribe();
       }
     };
-  }, [memoizedFilters, loading]);
+  }, [memoizedFilters]);
 
   // Actions CRUD
   const addProduct = useCallback(async (productData: ProductFormData): Promise<string> => {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useVins } from '@/hooks/useModernProducts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,11 +14,17 @@ import { Product, ProductFormData } from '@/types';
 import { toast } from 'sonner';
 
 export default function VinsPage() {
+  const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState('nom');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Éviter les problèmes d'hydratation
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Utiliser le hook moderne avec synchronisation temps réel
   const {
@@ -37,6 +44,17 @@ export default function VinsPage() {
     sortBy: sortBy as any,
     sortOrder: 'asc'
   });
+
+  // Debug logs
+  React.useEffect(() => {
+    console.log('🍷 VinsPage State:', {
+      mounted,
+      loading,
+      vinsCount: vins.length,
+      error,
+      connectionStatus
+    });
+  }, [mounted, loading, vins.length, error, connectionStatus]);
 
   // Statistiques spécifiques aux vins
   const vinsStats = useMemo(() => ({
@@ -117,6 +135,12 @@ export default function VinsPage() {
       case 'vin-rose': return '🌹';
       default: return '🍾';
     }
+  };
+
+  // Fonction pour formater les prix avec 2 décimales
+  const formatPrice = (price?: number): string => {
+    if (!price && price !== 0) return '0.00';
+    return price.toFixed(2);
   };
 
   // Composant pour le formulaire simple d'ajout
@@ -241,6 +265,20 @@ export default function VinsPage() {
       </form>
     );
   };
+
+  // Éviter les problèmes d'hydratation
+  if (!mounted) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Initialisation...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -369,7 +407,7 @@ export default function VinsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Valeur totale</p>
-                <p className="text-2xl font-bold">{vinsStats.valeurTotale.toFixed(2)}€</p>
+                <p className="text-2xl font-bold">{formatPrice(vinsStats.valeurTotale)}€</p>
               </div>
               <Wine className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -475,13 +513,13 @@ export default function VinsPage() {
                   {vin.prixVerre && (
                     <div>
                       <p className="text-muted-foreground">Prix au verre</p>
-                      <p className="font-semibold">{vin.prixVerre}€</p>
+                      <p className="font-semibold">{formatPrice(vin.prixVerre)}€</p>
                     </div>
                   )}
                   {vin.prixBouteille && (
                     <div>
                       <p className="text-muted-foreground">Prix bouteille</p>
-                      <p className="font-semibold">{vin.prixBouteille}€</p>
+                      <p className="font-semibold">{formatPrice(vin.prixBouteille)}€</p>
                     </div>
                   )}
                 </div>
