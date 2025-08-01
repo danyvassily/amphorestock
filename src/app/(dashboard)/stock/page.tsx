@@ -1,10 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from 'react';
+import { useGeneralStock } from '@/hooks/useModernProducts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Table,
   TableBody,
@@ -12,301 +15,473 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/table';
 import { 
   Search, 
   Package, 
-  PlusCircle,
-  MoreHorizontal,
+  Plus,
+  Minus,
   Edit,
   Trash2,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  Filter,
-  Download,
-  Zap,
-  Loader2,
-  Plus,
-  Minus,
-} from "lucide-react";
-import { Product } from "@/types";
-import Link from "next/link";
-import { toast } from "sonner";
-import { useStocks } from "@/hooks/useStocks";
-import { StockService } from "@/lib/stockService";
-import { useAuth } from "@/contexts/auth-context";
+  Wifi,
+  WifiOff,
+  Clock,
+  ArrowUpDown,
+  Euro,
+  BarChart3,
+  ShoppingCart
+} from 'lucide-react';
+import { Product, ProductFormData } from '@/types';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function StockPage() {
-  const { user } = useAuth();
-  const { stocks, loading, error, totalValue, lowStockCount, categoriesStats } = useStocks();
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [sortField, setSortField] = useState<keyof Product>("nom");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [stockStatusFilter, setStockStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('nom');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  // Filtrer et trier les produits
-  useEffect(() => {
-    let filtered = stocks;
+  // Utiliser le hook moderne pour le stock général
+  const {
+    products: stockGeneral,
+    loading,
+    error,
+    connectionStatus,
+    stats,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    removeStock,
+    addStock,
+    clearError
+  } = useGeneralStock({
+    search: searchTerm,
+    category: categoryFilter === 'all' ? undefined : categoryFilter as any,
+    stockStatus: stockStatusFilter === 'all' ? undefined : stockStatusFilter as any,
+    sortBy: sortBy as any,
+    sortOrder: sortDirection
+  });
 
-    // Filtrage par recherche
-    if (searchTerm) {
-      filtered = filtered.filter(product =>
-        product.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.fournisseur?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+  // Statistiques du stock général
+  const stockStats = useMemo(() => ({
+    total: stats.totalGeneral,
+    stockFaible: stats.lowStockCount,
+    enRupture: stats.outOfStockCount,
+    valeurTotale: stats.totalValue,
+    categories: stockGeneral.reduce((acc, product) => {
+      acc[product.categorie] = (acc[product.categorie] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  }), [stockGeneral, stats]);
 
-    // Filtrage par catégorie
-    if (selectedCategory !== "all") {
-      if (selectedCategory === "low-stock") {
-        filtered = filtered.filter(product => product.quantite <= product.seuilAlerte);
+  const handleQuickAdjustment = async (product: Product, adjustment: number) => {
+    try {
+      if (adjustment > 0) {
+        await addStock(product.id, adjustment, 'Ajustement manuel (+)');
       } else {
-        filtered = filtered.filter(product => product.categorie === selectedCategory);
+        await removeStock(product.id, Math.abs(adjustment), 'Ajustement manuel (-)');
       }
+      
+      toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`, {
+        description: `${product.nom} - ${Math.abs(adjustment)} ${product.unite}`,
+      });
+    } catch (error) {
+      toast.error('Erreur lors de l\'ajustement', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
     }
+  };
 
-    // Tri
-    filtered.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === "asc" 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-      
-      return 0;
-    });
+  const handleAddProduct = async (productData: ProductFormData) => {
+    try {
+      await addProduct({ ...productData, type: 'general' });
+      setShowAddDialog(false);
+      toast.success('Produit ajouté avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de l\'ajout', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
 
-    setFilteredProducts(filtered);
-  }, [stocks, searchTerm, selectedCategory, sortField, sortDirection]);
+  const handleEditProduct = async (productData: Partial<ProductFormData>) => {
+    if (!editingProduct) return;
+    
+    try {
+      await updateProduct(editingProduct.id, productData);
+      setEditingProduct(null);
+      toast.success('Produit modifié avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de la modification', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
 
-  const handleSort = (field: keyof Product) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+  const handleDeleteProduct = async (product: Product) => {
+    try {
+      await deleteProduct(product.id);
+      toast.success('Produit supprimé avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de la suppression', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
+
+  const getStockStatus = (product: Product) => {
+    if (product.quantite === 0) return { label: 'Rupture', variant: 'destructive' as const, color: 'text-red-500' };
+    if (product.quantite <= product.seuilAlerte) return { label: 'Stock faible', variant: 'secondary' as const, color: 'text-orange-500' };
+    return { label: 'Stock normal', variant: 'default' as const, color: '' };
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'spiritueux': return '🥃';
+      case 'bieres': return '🍺';
+      case 'softs': return '🥤';
+      case 'jus': return '🧃';
+      case 'eaux': return '💧';
+      default: return '📦';
+    }
+  };
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      setSortField(field);
-      setSortDirection("asc");
+      setSortBy(field);
+      setSortDirection('asc');
     }
   };
 
-  const handleDelete = async (productId: string) => {
-    try {
-      setActionLoading(productId);
-      await StockService.deleteProduct(productId);
-      toast.success("Produit supprimé");
-    } catch (error) {
-      console.error("Erreur suppression:", error);
-      toast.error("Erreur lors de la suppression");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleQuickAdjustment = async (productId: string, adjustment: number) => {
-    try {
-      setActionLoading(`${productId}-${adjustment > 0 ? 'add' : 'remove'}`);
-      const product = stocks.find(p => p.id === productId);
-      if (!product) return;
-
-      const newQuantity = Math.max(0, product.quantite + adjustment);
-      await StockService.updateQuantity(
-        productId, 
-        newQuantity, 
-        adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
-        undefined,
-        user?.uid || 'anonymous'
-      );
-      
-      toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);
-    } catch (error) {
-      console.error("Erreur ajustement:", error);
-      toast.error("Erreur lors de l'ajustement");
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
-
-  const getTotalValue = () => {
-    return filteredProducts.reduce((total, product) => 
-      total + (product.quantite * product.prixAchat), 0
-    );
-  };
-
-  const getLowStockCount = () => {
-    return stocks.filter(product => product.quantite <= product.seuilAlerte).length;
-  };
-
-  const categories = [
-    { value: "all", label: "Tous les produits", count: stocks.length },
-    { value: "low-stock", label: "Stock faible", count: getLowStockCount() },
-    { value: "vins", label: "Vins", count: stocks.filter(p => p.categorie === 'vins').length },
-    { value: "vin-rouge", label: "Vins rouges", count: stocks.filter(p => p.categorie === 'vin-rouge').length },
-    { value: "vin-blanc", label: "Vins blancs", count: stocks.filter(p => p.categorie === 'vin-blanc').length },
-    { value: "vin-rose", label: "Vins rosés", count: stocks.filter(p => p.categorie === 'vin-rose').length },
-    { value: "spiritueux", label: "Spiritueux", count: stocks.filter(p => p.categorie === 'spiritueux').length },
-    { value: "bieres", label: "Bières", count: stocks.filter(p => p.categorie === 'bieres').length },
-    { value: "softs", label: "Softs", count: stocks.filter(p => p.categorie === 'softs').length },
-    { value: "eaux", label: "Eaux", count: stocks.filter(p => p.categorie === 'eaux').length },
-  ].filter(cat => cat.count > 0); // Ne montrer que les catégories avec des produits
-
-  const SortIcon = ({ field }: { field: keyof Product }) => {
-    if (sortField !== field) return null;
-    return sortDirection === "asc" ? 
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortBy !== field) return <ArrowUpDown className="h-4 w-4 opacity-20" />;
+    return sortDirection === 'asc' ? 
       <TrendingUp className="h-4 w-4" /> : 
       <TrendingDown className="h-4 w-4" />;
   };
 
+  // Composant pour le formulaire simple d'ajout
+  const SimpleProductForm = ({ onSubmit, onCancel }: { 
+    onSubmit: (data: ProductFormData) => void; 
+    onCancel: () => void; 
+  }) => {
+    const [formData, setFormData] = useState<ProductFormData>({
+      nom: '',
+      categorie: 'autres',
+      type: 'general',
+      quantite: 0,
+      unite: 'piece',
+      prixAchat: 0,
+      prixVente: 0,
+      seuilAlerte: 5,
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSubmit(formData);
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Nom du produit *</label>
+          <Input
+            value={formData.nom}
+            onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+            placeholder="Ex: Coca-Cola 33cl"
+            required
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Catégorie *</label>
+            <Select value={formData.categorie} onValueChange={(value: any) => setFormData(prev => ({ ...prev, categorie: value }))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="spiritueux">🥃 Spiritueux</SelectItem>
+                <SelectItem value="bieres">🍺 Bières</SelectItem>
+                <SelectItem value="softs">🥤 Softs</SelectItem>
+                <SelectItem value="jus">🧃 Jus</SelectItem>
+                <SelectItem value="eaux">💧 Eaux</SelectItem>
+                <SelectItem value="autres">📦 Autres</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Unité *</label>
+            <Select value={formData.unite} onValueChange={(value: any) => setFormData(prev => ({ ...prev, unite: value }))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="piece">Pièce</SelectItem>
+                <SelectItem value="bouteille">Bouteille</SelectItem>
+                <SelectItem value="cannette">Cannette</SelectItem>
+                <SelectItem value="litre">Litre</SelectItem>
+                <SelectItem value="centilitre">Centilitre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Quantité *</label>
+            <Input
+              type="number"
+              value={formData.quantite}
+              onChange={(e) => setFormData(prev => ({ ...prev, quantite: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Prix d'achat (€) *</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.prixAchat}
+              onChange={(e) => setFormData(prev => ({ ...prev, prixAchat: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Prix de vente (€) *</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.prixVente}
+              onChange={(e) => setFormData(prev => ({ ...prev, prixVente: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Seuil d'alerte *</label>
+          <Input
+            type="number"
+            value={formData.seuilAlerte}
+            onChange={(e) => setFormData(prev => ({ ...prev, seuilAlerte: Number(e.target.value) }))}
+            min="1"
+            required
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button type="submit">
+            Ajouter le produit
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Chargement des stocks...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-red-600">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
-            <p>{error}</p>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Synchronisation en cours...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* En-tête avec indicateur de connexion */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Package className="h-8 w-8" />
-            Gestion du Stock
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+            📦 Stock Général
+            <div className="flex items-center gap-2 text-sm">
+              {connectionStatus.isConnected ? (
+                <Badge variant="default" className="bg-green-600">
+                  <Wifi className="h-3 w-3 mr-1" />
+                  Temps réel
+                </Badge>
+              ) : (
+                <Badge variant="destructive">
+                  <WifiOff className="h-3 w-3 mr-1" />
+                  Hors ligne
+                </Badge>
+              )}
+              {connectionStatus.lastSync && (
+                <Badge variant="outline">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {connectionStatus.lastSync.toLocaleTimeString()}
+                </Badge>
+              )}
+            </div>
           </h1>
-          <p className="text-muted-foreground">
-            Vue complète et gestion de votre inventaire ({stocks.length} produits)
+          <p className="text-muted-foreground mb-6">
+            Gestion de tous vos produits hors vins • Synchronisation temps réel
           </p>
         </div>
+
         <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/service">
-              <Zap className="mr-2 h-4 w-4" />
-              Service Rapide
-            </Link>
-          </Button>
           <Button asChild variant="outline">
-            <Link href="/produits/add">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Ajouter un produit
+            <Link href="/vins">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Cave à Vins
             </Link>
           </Button>
+          
+          <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un produit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Ajouter un nouveau produit</DialogTitle>
+                <DialogDescription>
+                  Remplissez les informations du produit à ajouter au stock général.
+                </DialogDescription>
+              </DialogHeader>
+              <SimpleProductForm
+                onSubmit={handleAddProduct}
+                onCancel={() => setShowAddDialog(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Statistiques rapides */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Gestion des erreurs */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <p className="text-destructive font-medium">{error}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={clearError}>
+                Réessayer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Statistiques du stock général */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Produits</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{filteredProducts.length}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total produits</p>
+                <p className="text-2xl font-bold">{stockStats.total}</p>
+              </div>
+              <Package className="h-8 w-8 text-muted-foreground" />
+            </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Valeur Stock</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(getTotalValue())}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Stock faible</p>
+                <p className="text-2xl font-bold text-orange-600">{stockStats.stockFaible}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-orange-600" />
+            </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Stock Faible</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{getLowStockCount()}</div>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">En rupture</p>
+                <p className="text-2xl font-bold text-red-600">{stockStats.enRupture}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Valeur Moyenne</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {filteredProducts.length > 0 ? formatCurrency(getTotalValue() / filteredProducts.length) : "0€"}
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Valeur totale</p>
+                <p className="text-2xl font-bold">{stockStats.valeurTotale.toFixed(2)}€</p>
+              </div>
+              <Euro className="h-8 w-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filtres */}
+      {/* Filtres et recherche */}
       <Card>
-        <CardHeader>
-          <CardTitle>Filtres et Recherche</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom ou fournisseur..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+        <CardContent className="pt-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Rechercher un produit... (temps réel)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
             
-            <div className="flex gap-2 flex-wrap">
-              {categories.map((category) => (
-                <Button
-                  key={category.value}
-                  variant={selectedCategory === category.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category.value)}
-                  className="flex items-center gap-1"
-                >
-                  {category.label}
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {category.count}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                <SelectItem value="spiritueux">🥃 Spiritueux</SelectItem>
+                <SelectItem value="bieres">🍺 Bières</SelectItem>
+                <SelectItem value="softs">🥤 Softs</SelectItem>
+                <SelectItem value="jus">🧃 Jus</SelectItem>
+                <SelectItem value="eaux">💧 Eaux</SelectItem>
+                <SelectItem value="autres">📦 Autres</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={stockStatusFilter} onValueChange={setStockStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="État du stock" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les états</SelectItem>
+                <SelectItem value="normal">Stock normal</SelectItem>
+                <SelectItem value="low">Stock faible</SelectItem>
+                <SelectItem value="out">En rupture</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -314,7 +489,7 @@ export default function StockPage() {
       {/* Tableau des produits */}
       <Card>
         <CardHeader>
-          <CardTitle>Inventaire ({filteredProducts.length} produits)</CardTitle>
+          <CardTitle>Inventaire du stock général ({stockGeneral.length} produits)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -323,7 +498,7 @@ export default function StockPage() {
                 <TableRow>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("nom")}
+                    onClick={() => handleSort('nom')}
                   >
                     <div className="flex items-center gap-2">
                       Produit <SortIcon field="nom" />
@@ -331,7 +506,7 @@ export default function StockPage() {
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("categorie")}
+                    onClick={() => handleSort('categorie')}
                   >
                     <div className="flex items-center gap-2">
                       Catégorie <SortIcon field="categorie" />
@@ -339,57 +514,44 @@ export default function StockPage() {
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted text-right"
-                    onClick={() => handleSort("quantite")}
+                    onClick={() => handleSort('quantite')}
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Stock <SortIcon field="quantite" />
                     </div>
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted text-right"
-                    onClick={() => handleSort("prixAchat")}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Prix Achat <SortIcon field="prixAchat" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted text-right"
-                    onClick={() => handleSort("prixVente")}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Prix Vente <SortIcon field="prixVente" />
-                    </div>
-                  </TableHead>
-                  <TableHead>Source</TableHead>
+                  <TableHead className="text-right">Prix</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => {
-                  const isLowStock = product.quantite <= product.seuilAlerte;
+                {stockGeneral.map((product) => {
+                  const stockStatus = getStockStatus(product);
                   
                   return (
                     <TableRow key={product.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{product.nom}</div>
-                          {product.subcategory && (
-                            <div className="text-sm text-muted-foreground">
-                              {product.subcategory}
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{getCategoryIcon(product.categorie)}</span>
+                          <div>
+                            <div className="font-medium">{product.nom}</div>
+                            {product.description && (
+                              <div className="text-sm text-muted-foreground">
+                                {product.description}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="capitalize">
-                          {product.categorie.replace('-', ' ')}
+                        <Badge variant="outline">
+                          {product.categorie}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className={`font-medium ${isLowStock ? 'text-red-500' : ''}`}>
+                        <div className={`font-medium ${stockStatus.color}`}>
                           {product.quantite} {product.unite}
-                          {isLowStock && (
+                          {(product.quantite <= product.seuilAlerte) && (
                             <AlertTriangle className="inline h-4 w-4 ml-1" />
                           )}
                         </div>
@@ -398,79 +560,49 @@ export default function StockPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(product.prixAchat)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div>{formatCurrency(product.prixVente)}</div>
-                        {product.prixVerre && (
-                          <div className="text-sm text-muted-foreground">
-                            Verre: {formatCurrency(product.prixVerre)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {product.source}
-                        </Badge>
+                        <div className="font-medium">{product.prixVente.toFixed(2)}€</div>
+                        <div className="text-sm text-muted-foreground">
+                          Achat: {product.prixAchat.toFixed(2)}€
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center gap-1 justify-end">
-                          {/* Boutons d'ajustement rapide */}
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleQuickAdjustment(product.id, -1)}
-                            disabled={actionLoading === `${product.id}-remove`}
+                            onClick={() => handleQuickAdjustment(product, -1)}
+                            disabled={product.quantite === 0}
                             className="h-8 w-8 p-0"
                           >
-                            {actionLoading === `${product.id}-remove` ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Minus className="h-3 w-3" />
-                            )}
+                            <Minus className="h-3 w-3" />
                           </Button>
                           
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleQuickAdjustment(product.id, 1)}
-                            disabled={actionLoading === `${product.id}-add`}
+                            onClick={() => handleQuickAdjustment(product, 1)}
                             className="h-8 w-8 p-0"
                           >
-                            {actionLoading === `${product.id}-add` ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Plus className="h-3 w-3" />
-                            )}
+                            <Plus className="h-3 w-3" />
                           </Button>
 
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDelete(product.id)}
-                                disabled={actionLoading === product.id}
-                              >
-                                {actionLoading === product.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                )}
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEditingProduct(product)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteProduct(product)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -480,21 +612,18 @@ export default function StockPage() {
             </Table>
           </div>
           
-          {filteredProducts.length === 0 && (
+          {stockGeneral.length === 0 && !loading && (
             <div className="text-center py-12">
               <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-semibold mb-2">Aucun produit trouvé</h3>
               <p className="text-muted-foreground mb-4">
-                {searchTerm || selectedCategory !== "all" 
-                  ? "Aucun produit ne correspond à vos critères de recherche"
-                  : "Commencez par importer vos données Excel ou ajouter des produits"
-                }
+                {searchTerm || categoryFilter !== 'all' || stockStatusFilter !== 'all'
+                  ? 'Aucun produit ne correspond à vos critères de recherche.'
+                  : 'Votre stock général est vide. Commencez par ajouter des produits.'}
               </p>
-              <Button asChild>
-                <Link href="/produits/add">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Ajouter le premier produit
-                </Link>
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter votre premier produit
               </Button>
             </div>
           )}
@@ -502,4 +631,4 @@ export default function StockPage() {
       </Card>
     </div>
   );
-} 
+}

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "import-stocks": "npx tsx scripts/importStocks.ts"
+    "import-stocks": "npx tsx scripts/importStocks.ts",
+    "clean-firebase": "npx tsx scripts/cleanFirebase.ts",
+    "new-import": "npx tsx scripts/newImportStocks.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.0",

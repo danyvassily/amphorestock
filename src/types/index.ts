@@ -10,17 +10,48 @@ export interface User {
   updatedAt: Date;
 }
 
+// Nouveau type moderne pour les produits
 export interface Product {
   id: string;
   nom: string; // Nom du produit
   categorie: ProductCategory; // Catégorie du produit
-  subcategory?: string;
+  type: 'vins' | 'general'; // Type principal : vins ou stock général
   quantite: number; // Quantité en stock
   unite: ProductUnit; // Unité de mesure
   prixAchat: number; // Prix d'achat principal
   prixVente: number; // Prix de vente principal
   
-  // Champs spécifiques pour les vins (structure détaillée)
+  // Prix spécifiques pour les vins
+  prixVerre?: number; // Prix au verre (pour les vins/spiritueux)
+  prixBouteille?: number; // Prix bouteille (si différent du prix de vente)
+  
+  // Informations détaillées (optionnelles)
+  description?: string;
+  fournisseur?: string;
+  codeBarre?: string;
+  seuilAlerte: number; // Seuil minimum pour les alertes de stock
+  isActive: boolean;
+  
+  // Métadonnées
+  source: string; // 'vins' | 'boissons' - pour tracking origine
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string; // UID de l'utilisateur qui a créé
+  modifiedBy?: string; // UID de l'utilisateur qui a modifié
+}
+
+// Type legacy pour rétro-compatibilité avec l'ancien système
+export interface LegacyProduct {
+  id: string;
+  nom: string;
+  categorie: ProductCategory;
+  subcategory?: string;
+  quantite: number;
+  unite: ProductUnit;
+  prixAchat: number;
+  prixVente: number;
+  
+  // Champs spécifiques pour les vins (structure détaillée legacy)
   auVerre?: {
     prixAchatHT: number;
     prixAchatTTC: number;
@@ -34,20 +65,18 @@ export interface Product {
     prixVenteTTC: number;
   };
   
-  // Champs legacy pour compatibilité
-  prixVerre?: number; // Prix au verre (pour les vins/spiritueux)
-  prixBouteille?: number; // Prix bouteille (si différent du prix de vente)
-  
+  prixVerre?: number;
+  prixBouteille?: number;
   description?: string;
   fournisseur?: string;
   codeBarre?: string;
-  seuilAlerte: number; // Seuil minimum pour les alertes de stock
-  source: string; // "boissons" ou "vins" - obligatoire pour tracking
+  seuilAlerte: number;
+  source: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: string; // UID de l'utilisateur qui a créé
-  modifiedBy?: string; // UID de l'utilisateur qui a modifié (optionnel car pas présent sur les anciens produits)
+  createdBy: string;
+  modifiedBy?: string;
 }
 
 export type ProductCategory = 
@@ -180,6 +209,50 @@ export interface FileUploadResult {
   fileSize: number;
   processedData?: any;
   error?: string;
+}
+
+// Nouveaux types pour l'interface moderne
+export interface FilterOptions {
+  search?: string;
+  category?: ProductCategory | 'all';
+  type?: 'vins' | 'general' | 'all';
+  stockStatus?: 'all' | 'normal' | 'low' | 'out';
+  sortBy?: 'nom' | 'quantite' | 'prixAchat' | 'prixVente' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface ProductFormData {
+  nom: string;
+  categorie: ProductCategory;
+  type: 'vins' | 'general';
+  quantite: number;
+  unite: ProductUnit;
+  prixAchat: number;
+  prixVente: number;
+  prixVerre?: number;
+  prixBouteille?: number;
+  description?: string;
+  fournisseur?: string;
+  seuilAlerte: number;
+}
+
+export interface RealtimeConnectionStatus {
+  isConnected: boolean;
+  lastSync: Date | null;
+  error?: string;
+}
+
+export interface BulkImportResult {
+  success: boolean;
+  totalProcessed: number;
+  successCount: number;
+  errorCount: number;
+  errors: Array<{
+    row: number;
+    product: string;
+    error: string;
+  }>;
+  importedProducts: Product[];
 }
 
 // Types pour les cocktails

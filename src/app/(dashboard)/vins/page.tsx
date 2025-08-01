@@ -1,559 +1,586 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { 
-  Search, 
-  Wine, 
-  PlusCircle,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  AlertTriangle,
-  TrendingUp,
-  TrendingDown,
-  Filter,
-  Loader2,
-  Plus,
-  Minus,
-  Grape,
-  Euro,
-  BarChart3,
-  ArrowRight
-} from "lucide-react";
-import { Product } from "@/types";
-import Link from "next/link";
-import { toast } from "sonner";
-import { useStocks } from "@/hooks/useStocks";
-import { StockService } from "@/lib/stockService";
-import { getCategoryColor, getCategoryLabel } from "@/lib/product-classifier";
-import { EditProductCategoryDialog } from "@/components/edit-product-category-dialog";
-import { useAuth } from "@/contexts/auth-context";
+import { useState, useMemo } from 'react';
+import { useVins } from '@/hooks/useModernProducts';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Search, Plus, Minus, Wine, AlertTriangle, Edit, Trash2, Wifi, WifiOff, Clock } from 'lucide-react';
+import { Product, ProductFormData } from '@/types';
+import { toast } from 'sonner';
 
 export default function VinsPage() {
-  const { user } = useAuth();
-  // Filtrer uniquement les vins
-  const { stocks, loading, error } = useStocks();
-  const [filteredWines, setFilteredWines] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedWineType, setSelectedWineType] = useState<string>("all");
-  const [sortField, setSortField] = useState<keyof Product>("nom");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('nom');
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
 
-  // Filtrer les vins de tous les stocks
-  const wines = stocks.filter(product => 
-    product.categorie === 'vins' || 
-    product.categorie === 'vin-rouge' || 
-    product.categorie === 'vin-blanc' || 
-    product.categorie === 'vin-rose'
-  );
+  // Utiliser le hook moderne avec synchronisation temps réel
+  const {
+    products: vins,
+    loading,
+    error,
+    connectionStatus,
+    stats,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    removeStock,
+    clearError
+  } = useVins({
+    search: searchTerm,
+    category: categoryFilter === 'all' ? undefined : categoryFilter as any,
+    sortBy: sortBy as any,
+    sortOrder: 'asc'
+  });
 
-  // Filtrer et trier les vins
-  useEffect(() => {
-    // Recalculer les vins à l'intérieur du useEffect
-    const wines = stocks.filter(product => 
-      product.categorie === 'vins' || 
-      product.categorie === 'vin-rouge' || 
-      product.categorie === 'vin-blanc' || 
-      product.categorie === 'vin-rose'
-    );
+  // Statistiques spécifiques aux vins
+  const vinsStats = useMemo(() => ({
+    total: stats.totalVins,
+    stockFaible: stats.lowStockCount,
+    enRupture: stats.outOfStockCount,
+    valeurTotale: stats.totalValue,
+    categories: {
+      rouge: vins.filter(v => v.categorie === 'vin-rouge').length,
+      blanc: vins.filter(v => v.categorie === 'vin-blanc').length,
+      rose: vins.filter(v => v.categorie === 'vin-rose').length,
+      autres: vins.filter(v => v.categorie === 'vins').length,
+    }
+  }), [vins, stats]);
+
+  const handleQuickSale = async (product: Product, type: 'verre' | 'bouteille') => {
+    try {
+      const quantity = 1; // 1 verre ou 1 bouteille
+      await removeStock(product.id, quantity, `Vente ${type}`);
+      
+      toast.success(`Vente ${type} enregistrée`, {
+        description: `${product.nom} - ${quantity} ${type}`,
+      });
+    } catch (error) {
+      toast.error('Erreur lors de la vente', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
+
+  const handleAddProduct = async (productData: ProductFormData) => {
+    try {
+      await addProduct({ ...productData, type: 'vins' });
+      setShowAddDialog(false);
+      toast.success('Vin ajouté avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de l\'ajout', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
+
+  const handleEditProduct = async (productData: Partial<ProductFormData>) => {
+    if (!editingProduct) return;
     
-    let filtered = wines;
-
-    // Filtrage par recherche
-    if (searchTerm) {
-      filtered = filtered.filter(wine =>
-        wine.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        wine.fournisseur?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        wine.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    try {
+      await updateProduct(editingProduct.id, productData);
+      setEditingProduct(null);
+      toast.success('Vin modifié avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de la modification', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
     }
+  };
 
-    // Filtrage par type de vin
-    if (selectedWineType !== "all") {
-      if (selectedWineType === "low-stock") {
-        filtered = filtered.filter(wine => wine.quantite <= wine.seuilAlerte);
-      } else {
-        filtered = filtered.filter(wine => wine.categorie === selectedWineType);
-      }
+  const handleDeleteProduct = async (product: Product) => {
+    try {
+      await deleteProduct(product.id);
+      toast.success('Vin supprimé avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de la suppression', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
     }
+  };
 
-    // Tri
-    filtered.sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortDirection === "asc" 
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
-      }
-      
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      }
-      
-      return 0;
+  const getStockStatus = (product: Product) => {
+    if (product.quantite === 0) return { label: 'Rupture', variant: 'destructive' as const };
+    if (product.quantite <= product.seuilAlerte) return { label: 'Stock faible', variant: 'secondary' as const };
+    return { label: 'Stock normal', variant: 'default' as const };
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'vin-rouge': return '🍷';
+      case 'vin-blanc': return '🥂';
+      case 'vin-rose': return '🌹';
+      default: return '🍾';
+    }
+  };
+
+  // Composant pour le formulaire simple d'ajout
+  const SimpleProductForm = ({ onSubmit, onCancel }: { 
+    onSubmit: (data: ProductFormData) => void; 
+    onCancel: () => void; 
+  }) => {
+    const [formData, setFormData] = useState<ProductFormData>({
+      nom: '',
+      categorie: 'vin-rouge',
+      type: 'vins',
+      quantite: 0,
+      unite: 'bouteille',
+      prixAchat: 0,
+      prixVente: 0,
+      seuilAlerte: 3,
     });
 
-    setFilteredWines(filtered);
-  }, [stocks, searchTerm, selectedWineType, sortField, sortDirection]);
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSubmit(formData);
+    };
 
-  const handleSort = (field: keyof Product) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Nom du vin *</label>
+          <Input
+            value={formData.nom}
+            onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+            placeholder="Ex: Château Margaux 2018"
+            required
+          />
+        </div>
 
-  const handleDelete = async (productId: string) => {
-    try {
-      setActionLoading(productId);
-      await StockService.deleteProduct(productId);
-      toast.success("Vin supprimé");
-    } catch (error) {
-      console.error("Erreur suppression:", error);
-      toast.error("Erreur lors de la suppression");
-    } finally {
-      setActionLoading(null);
-    }
-  };
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Catégorie *</label>
+            <Select value={formData.categorie} onValueChange={(value: any) => setFormData(prev => ({ ...prev, categorie: value }))}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vin-rouge">🍷 Vin rouge</SelectItem>
+                <SelectItem value="vin-blanc">🥂 Vin blanc</SelectItem>
+                <SelectItem value="vin-rose">🌹 Vin rosé</SelectItem>
+                <SelectItem value="vins">🍾 Autres vins</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-  const handleQuickAdjustment = async (productId: string, adjustment: number) => {
-    try {
-      setActionLoading(`${productId}-${adjustment > 0 ? 'add' : 'remove'}`);
-      const product = wines.find(p => p.id === productId);
-      if (!product) return;
+          <div>
+            <label className="block text-sm font-medium mb-1">Quantité *</label>
+            <Input
+              type="number"
+              value={formData.quantite}
+              onChange={(e) => setFormData(prev => ({ ...prev, quantite: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
+        </div>
 
-      const newQuantity = Math.max(0, product.quantite + adjustment);
-      await StockService.updateQuantity(
-        productId, 
-        newQuantity, 
-        adjustment > 0 ? 'entree' : 'sortie',
-        adjustment > 0 ? 'Ajustement manuel (+)' : 'Ajustement manuel (-)',
-        undefined,
-        user?.uid || 'anonymous'
-      );
-      
-      toast.success(`Stock ${adjustment > 0 ? 'ajouté' : 'retiré'}`);
-    } catch (error) {
-      console.error("Erreur ajustement:", error);
-      toast.error("Erreur lors de l'ajustement");
-    } finally {
-      setActionLoading(null);
-    }
-  };
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Prix d'achat (€) *</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.prixAchat}
+              onChange={(e) => setFormData(prev => ({ ...prev, prixAchat: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
 
-  const handleEditCategory = (wine: Product) => {
-    setEditingProduct(wine);
-    setIsCategoryDialogOpen(true);
-  };
+          <div>
+            <label className="block text-sm font-medium mb-1">Prix de vente (€) *</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.prixVente}
+              onChange={(e) => setFormData(prev => ({ ...prev, prixVente: Number(e.target.value) }))}
+              min="0"
+              required
+            />
+          </div>
+        </div>
 
-  const handleCloseCategoryDialog = () => {
-    setEditingProduct(null);
-    setIsCategoryDialogOpen(false);
-  };
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Prix au verre (€)</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={formData.prixVerre || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, prixVerre: e.target.value ? Number(e.target.value) : undefined }))}
+              min="0"
+            />
+          </div>
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount);
-  };
+          <div>
+            <label className="block text-sm font-medium mb-1">Seuil d'alerte *</label>
+            <Input
+              type="number"
+              value={formData.seuilAlerte}
+              onChange={(e) => setFormData(prev => ({ ...prev, seuilAlerte: Number(e.target.value) }))}
+              min="1"
+              required
+            />
+          </div>
+        </div>
 
-  const getTotalValue = () => {
-    return filteredWines.reduce((total, wine) => 
-      total + (wine.quantite * wine.prixAchat), 0
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button type="submit">
+            Ajouter le vin
+          </Button>
+        </div>
+      </form>
     );
-  };
-
-  const getLowStockCount = () => {
-    return wines.filter(wine => wine.quantite <= wine.seuilAlerte).length;
-  };
-
-  const getAveragePrice = () => {
-    if (filteredWines.length === 0) return 0;
-    return filteredWines.reduce((total, wine) => total + wine.prixVente, 0) / filteredWines.length;
-  };
-
-  const wineTypes = [
-    { value: "all", label: "Tous les vins", count: wines.length },
-    { value: "low-stock", label: "Stock faible", count: getLowStockCount() },
-    { value: "vin-rouge", label: "Vins rouges", count: wines.filter(w => w.categorie === 'vin-rouge').length },
-    { value: "vin-blanc", label: "Vins blancs", count: wines.filter(w => w.categorie === 'vin-blanc').length },
-    { value: "vin-rose", label: "Vins rosés", count: wines.filter(w => w.categorie === 'vin-rose').length },
-    { value: "vins", label: "Vins génériques", count: wines.filter(w => w.categorie === 'vins').length },
-  ].filter(type => type.count > 0);
-
-  const SortIcon = ({ field }: { field: keyof Product }) => {
-    if (sortField !== field) return null;
-    return sortDirection === "asc" ? 
-      <TrendingUp className="h-4 w-4" /> : 
-      <TrendingDown className="h-4 w-4" />;
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Chargement des vins...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-red-600">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
-            <p>{error}</p>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Synchronisation en cours...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* En-tête avec indicateur de connexion */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Wine className="h-8 w-8" />
-            Cave à Vins
+          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+            🍷 Gestion des Vins
+            <div className="flex items-center gap-2 text-sm">
+              {connectionStatus.isConnected ? (
+                <Badge variant="default" className="bg-green-600">
+                  <Wifi className="h-3 w-3 mr-1" />
+                  Temps réel
+                </Badge>
+              ) : (
+                <Badge variant="destructive">
+                  <WifiOff className="h-3 w-3 mr-1" />
+                  Hors ligne
+                </Badge>
+              )}
+              {connectionStatus.lastSync && (
+                <Badge variant="outline">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {connectionStatus.lastSync.toLocaleTimeString()}
+                </Badge>
+              )}
+            </div>
           </h1>
-          <p className="text-muted-foreground">
-            Gestion complète de votre cave ({wines.length} vins)
+          <p className="text-muted-foreground mb-6">
+            Gérez votre cave et vos ventes au verre ou à la bouteille • Synchronisation temps réel
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <Link href="/stock">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Tout le Stock
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/produits/add">
-              <PlusCircle className="mr-2 h-4 w-4" />
+
+        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
               Ajouter un vin
-            </Link>
-          </Button>
-        </div>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Ajouter un nouveau vin</DialogTitle>
+              <DialogDescription>
+                Remplissez les informations du vin à ajouter à votre cave.
+              </DialogDescription>
+            </DialogHeader>
+            <SimpleProductForm
+              onSubmit={handleAddProduct}
+              onCancel={() => setShowAddDialog(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Statistiques spécialisées pour les vins */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Grape className="h-4 w-4" />
-              Total Vins
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{filteredWines.length}</div>
-            <p className="text-xs text-muted-foreground">
-              sur {wines.length} total
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Euro className="h-4 w-4" />
-              Valeur Cave
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(getTotalValue())}</div>
-            <p className="text-xs text-muted-foreground">
-              valeur d&apos;achat
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Stock Faible</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-500">{getLowStockCount()}</div>
-            <p className="text-xs text-muted-foreground">
-              vins à réapprovisionner
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Prix Moyen</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(getAveragePrice())}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              prix de vente moyen
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filtres spécialisés */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtres et Recherche</CardTitle>
-          <CardDescription>Explorez votre cave selon vos critères</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom, domaine, fournisseur..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            
-            <div className="flex gap-2 flex-wrap">
-              {wineTypes.map((type) => (
-                <Button
-                  key={type.value}
-                  variant={selectedWineType === type.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedWineType(type.value)}
-                  className="flex items-center gap-1"
-                >
-                  {type.label}
-                  <Badge variant="secondary" className="ml-1 text-xs">
-                    {type.count}
-                  </Badge>
-                </Button>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tableau des vins */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Cave à Vins ({filteredWines.length} vins)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("nom")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Vin <SortIcon field="nom" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted"
-                    onClick={() => handleSort("categorie")}
-                  >
-                    <div className="flex items-center gap-2">
-                      Type <SortIcon field="categorie" />
-                    </div>
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted text-right"
-                    onClick={() => handleSort("quantite")}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Stock <SortIcon field="quantite" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-right">Prix</TableHead>
-                  <TableHead>Fournisseur</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWines.map((wine) => {
-                  const isLowStock = wine.quantite <= wine.seuilAlerte;
-                  
-                  return (
-                    <TableRow key={wine.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{wine.nom}</div>
-                          {wine.description && (
-                            <div className="text-sm text-muted-foreground">
-                              {wine.description}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant="outline" 
-                          className={`${getCategoryColor(wine.categorie)} border`}
-                        >
-                          {getCategoryLabel(wine.categorie)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className={`font-medium ${isLowStock ? 'text-red-500' : ''}`}>
-                          {wine.quantite} {wine.unite}
-                          {isLowStock && (
-                            <AlertTriangle className="inline h-4 w-4 ml-1" />
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Seuil: {wine.seuilAlerte}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="font-medium">{formatCurrency(wine.prixVente)}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Achat: {formatCurrency(wine.prixAchat)}
-                        </div>
-                        {wine.prixVerre && (
-                          <div className="text-sm text-green-600">
-                            Verre: {formatCurrency(wine.prixVerre)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {wine.fournisseur || "Non spécifié"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center gap-1 justify-end">
-                          {/* Boutons d'ajustement rapide */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleQuickAdjustment(wine.id, -1)}
-                            disabled={actionLoading === `${wine.id}-remove`}
-                            className="h-8 w-8 p-0"
-                          >
-                            {actionLoading === `${wine.id}-remove` ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Minus className="h-3 w-3" />
-                            )}
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleQuickAdjustment(wine.id, 1)}
-                            disabled={actionLoading === `${wine.id}-add`}
-                            className="h-8 w-8 p-0"
-                          >
-                            {actionLoading === `${wine.id}-add` ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Plus className="h-3 w-3" />
-                            )}
-                          </Button>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => handleEditCategory(wine)}>
-                                <ArrowRight className="mr-2 h-4 w-4" />
-                                Changer de catégorie
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDelete(wine.id)}
-                                disabled={actionLoading === wine.id}
-                              >
-                                {actionLoading === wine.id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                )}
-                                Supprimer
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          
-          {filteredWines.length === 0 && (
-            <div className="text-center py-12">
-              <Wine className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">Aucun vin trouvé</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm || selectedWineType !== "all" 
-                  ? "Aucun vin ne correspond à vos critères de recherche"
-                  : "Votre cave est vide. Commencez par importer vos données Excel ou ajouter des vins"
-                }
-              </p>
-              <Button asChild>
-                <Link href="/produits/add">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Ajouter le premier vin
-                </Link>
+      {/* Gestion des erreurs */}
+      {error && (
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                <p className="text-destructive font-medium">{error}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={clearError}>
+                Réessayer
               </Button>
             </div>
-          )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Statistiques des vins */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total vins</p>
+                <p className="text-2xl font-bold">{vinsStats.total}</p>
+              </div>
+              <Wine className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Stock faible</p>
+                <p className="text-2xl font-bold text-orange-600">{vinsStats.stockFaible}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">En rupture</p>
+                <p className="text-2xl font-bold text-red-600">{vinsStats.enRupture}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Valeur totale</p>
+                <p className="text-2xl font-bold">{vinsStats.valeurTotale.toFixed(2)}€</p>
+              </div>
+              <Wine className="h-8 w-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Par catégorie</p>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span>🍷 Rouges</span>
+                  <span className="font-semibold">{vinsStats.categories.rouge}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>🥂 Blancs</span>
+                  <span className="font-semibold">{vinsStats.categories.blanc}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>🌹 Rosés</span>
+                  <span className="font-semibold">{vinsStats.categories.rose}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtres et recherche */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                <Input
+                  placeholder="Rechercher un vin... (temps réel)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes catégories</SelectItem>
+                <SelectItem value="vin-rouge">🍷 Vins rouges</SelectItem>
+                <SelectItem value="vin-blanc">🥂 Vins blancs</SelectItem>
+                <SelectItem value="vin-rose">🌹 Vins rosés</SelectItem>
+                <SelectItem value="vins">🍾 Autres vins</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Trier par" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nom">Nom A-Z</SelectItem>
+                <SelectItem value="quantite">Quantité</SelectItem>
+                <SelectItem value="prixVente">Prix</SelectItem>
+                <SelectItem value="createdAt">Date d'ajout</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Dialogue de modification de catégorie */}
-      <EditProductCategoryDialog
-        product={editingProduct}
-        isOpen={isCategoryDialogOpen}
-        onClose={handleCloseCategoryDialog}
-      />
+      {/* Liste des vins */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {vins.map((vin) => {
+          const stockStatus = getStockStatus(vin);
+          
+          return (
+            <Card key={vin.id} className="relative overflow-hidden hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg leading-tight flex items-center gap-2">
+                      {getCategoryIcon(vin.categorie)}
+                      {vin.nom}
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {vin.categorie} • {vin.quantite} {vin.unite}
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant={stockStatus.variant} className="text-xs">
+                      {stockStatus.label}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                {/* Prix */}
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {vin.prixVerre && (
+                    <div>
+                      <p className="text-muted-foreground">Prix au verre</p>
+                      <p className="font-semibold">{vin.prixVerre}€</p>
+                    </div>
+                  )}
+                  {vin.prixBouteille && (
+                    <div>
+                      <p className="text-muted-foreground">Prix bouteille</p>
+                      <p className="font-semibold">{vin.prixBouteille}€</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions de vente rapide */}
+                <div className="flex gap-2">
+                  {vin.prixVerre && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleQuickSale(vin, 'verre')}
+                      disabled={vin.quantite === 0}
+                      className="flex-1"
+                    >
+                      <Minus className="h-4 w-4 mr-1" />
+                      Verre
+                    </Button>
+                  )}
+                  
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleQuickSale(vin, 'bouteille')}
+                    disabled={vin.quantite === 0}
+                    className="flex-1"
+                  >
+                    <Minus className="h-4 w-4 mr-1" />
+                    Bouteille
+                  </Button>
+                </div>
+
+                {/* Actions d'édition */}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingProduct(vin)}
+                    className="flex-1"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Modifier
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteProduct(vin)}
+                    className="flex-1 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Supprimer
+                  </Button>
+                </div>
+
+                {/* Barre de stock visuelle */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Stock: {vin.quantite}</span>
+                    <span>Seuil: {vin.seuilAlerte}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        vin.quantite === 0 
+                          ? 'bg-red-500' 
+                          : vin.quantite <= vin.seuilAlerte 
+                          ? 'bg-orange-500' 
+                          : 'bg-green-500'
+                      }`}
+                      data-width={Math.min((vin.quantite / (vin.seuilAlerte * 3)) * 100, 100)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Message si aucun vin trouvé */}
+      {vins.length === 0 && !loading && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-12">
+              <Wine className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Aucun vin trouvé</h3>
+              <p className="text-muted-foreground mb-4">
+                {searchTerm || categoryFilter !== 'all'
+                  ? 'Aucun vin ne correspond à vos critères de recherche.'
+                  : 'Votre cave est vide. Commencez par ajouter des vins.'}
+              </p>
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter votre premier vin
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
-} 
+}
