@@ -37,6 +37,7 @@ export default function VinsPage() {
     updateProduct,
     deleteProduct,
     removeStock,
+    addStock,
     clearError
   } = useVins({
     search: searchTerm,
@@ -80,6 +81,20 @@ export default function VinsPage() {
       });
     } catch (error) {
       toast.error('Erreur lors de la vente', {
+        description: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  };
+
+  const handleAddStock = async (product: Product, quantity: number = 1) => {
+    try {
+      await addStock(product.id, quantity, `Ajout manuel - ${quantity} bouteille${quantity > 1 ? 's' : ''}`);
+      
+      toast.success(`Stock ajouté avec succès`, {
+        description: `${product.nom} - +${quantity} bouteille${quantity > 1 ? 's' : ''}`,
+      });
+    } catch (error) {
+      toast.error('Erreur lors de l\'ajout de stock', {
         description: error instanceof Error ? error.message : 'Erreur inconnue',
       });
     }
@@ -152,11 +167,12 @@ export default function VinsPage() {
       nom: '',
       categorie: 'vin-rouge',
       type: 'vins',
-      quantite: 0,
+      quantite: 1,
       unite: 'bouteille',
       prixAchat: 0,
       prixVente: 0,
       seuilAlerte: 3,
+      fournisseur: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -166,14 +182,25 @@ export default function VinsPage() {
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Nom du vin *</label>
-          <Input
-            value={formData.nom}
-            onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
-            placeholder="Ex: Château Margaux 2018"
-            required
-          />
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Nom du vin *</label>
+            <Input
+              value={formData.nom}
+              onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
+              placeholder="Ex: Château Margaux 2018"
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1">Fournisseur</label>
+            <Input
+              value={formData.fournisseur || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, fournisseur: e.target.value }))}
+              placeholder="Ex: Domaine de la Côte d'Or"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -204,53 +231,58 @@ export default function VinsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Prix d'achat (€) *</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.prixAchat}
-              onChange={(e) => setFormData(prev => ({ ...prev, prixAchat: Number(e.target.value) }))}
-              min="0"
-              required
-            />
-          </div>
+        {/* Section Prix */}
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium mb-3 text-muted-foreground">💰 Informations tarifaires</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Prix d'achat (€) *</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={formData.prixAchat}
+                onChange={(e) => setFormData(prev => ({ ...prev, prixAchat: Number(e.target.value) }))}
+                min="0"
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Prix de vente (€) *</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.prixVente}
-              onChange={(e) => setFormData(prev => ({ ...prev, prixVente: Number(e.target.value) }))}
-              min="0"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Prix de vente bouteille (€) *</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={formData.prixVente}
+                onChange={(e) => setFormData(prev => ({ ...prev, prixVente: Number(e.target.value) }))}
+                min="0"
+                required
+              />
+            </div>
           </div>
-        </div>
+          <div className="grid grid-cols-2 gap-4 mt-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Prix au verre (€)</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={formData.prixVerre || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, prixVerre: e.target.value ? Number(e.target.value) : undefined }))}
+                min="0"
+                placeholder="Optionnel"
+              />
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Prix au verre (€)</label>
-            <Input
-              type="number"
-              step="0.01"
-              value={formData.prixVerre || ''}
-              onChange={(e) => setFormData(prev => ({ ...prev, prixVerre: e.target.value ? Number(e.target.value) : undefined }))}
-              min="0"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Seuil d'alerte *</label>
-            <Input
-              type="number"
-              value={formData.seuilAlerte}
-              onChange={(e) => setFormData(prev => ({ ...prev, seuilAlerte: Number(e.target.value) }))}
-              min="1"
-              required
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Seuil d'alerte *</label>
+              <Input
+                type="number"
+                value={formData.seuilAlerte}
+                onChange={(e) => setFormData(prev => ({ ...prev, seuilAlerte: Number(e.target.value) }))}
+                min="1"
+                required
+                placeholder="Ex: 3"
+              />
+            </div>
           </div>
         </div>
 
@@ -524,31 +556,56 @@ export default function VinsPage() {
                   )}
                 </div>
 
-                {/* Actions de vente rapide */}
-                <div className="flex gap-2">
-                  {vin.prixVerre && (
+                {/* Gestion du stock */}
+                <div className="space-y-2">
+                  {/* Ajout de stock */}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleAddStock(vin, 1)}
+                      className="flex-1"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      +1 Bouteille
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleAddStock(vin, 5)}
+                      className="flex-1"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      +5 Bouteilles
+                    </Button>
+                  </div>
+
+                  {/* Actions de vente rapide */}
+                  <div className="flex gap-2">
+                    {vin.prixVerre && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleQuickSale(vin, 'verre')}
+                        disabled={vin.quantite === 0}
+                        className="flex-1"
+                      >
+                        <Minus className="h-4 w-4 mr-1" />
+                        Verre
+                      </Button>
+                    )}
+                    
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleQuickSale(vin, 'verre')}
+                      onClick={() => handleQuickSale(vin, 'bouteille')}
                       disabled={vin.quantite === 0}
                       className="flex-1"
                     >
                       <Minus className="h-4 w-4 mr-1" />
-                      Verre
+                      Bouteille
                     </Button>
-                  )}
-                  
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleQuickSale(vin, 'bouteille')}
-                    disabled={vin.quantite === 0}
-                    className="flex-1"
-                  >
-                    <Minus className="h-4 w-4 mr-1" />
-                    Bouteille
-                  </Button>
+                  </div>
                 </div>
 
                 {/* Actions d'édition */}

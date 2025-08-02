@@ -25,7 +25,7 @@ export function useModernProducts(filters?: FilterOptions) {
     filters?.stockStatus,
     filters?.sortBy,
     filters?.sortOrder,
-    filters,
+    // Retrait de 'filters' pour éviter les re-calculs constants
   ]);
 
   // Initialisation et écoute temps réel

@@ -29,7 +29,9 @@ import {
   Clock,
   ArrowUpDown,
   Euro,
-  BarChart3
+  BarChart3,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { Product, ProductFormData } from '@/types';
 import Link from 'next/link';

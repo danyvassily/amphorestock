@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { collection, query, onSnapshot, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, ProductCategory } from '@/types';
@@ -24,27 +24,35 @@ export function useStocks(options: UseStocksOptions = {}): UseStocksReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Mémorisation des options pour éviter les re-renders inutiles
+  const memoizedOptions = useMemo(() => options, [
+    options?.category,
+    options?.source,
+    options?.onlyLowStock,
+    options?.limit,
+  ]);
+
   useEffect(() => {
     try {
       // Construction de la requête - éviter de combiner orderBy avec where pour éviter les erreurs d'index
       let q;
       
-      if (options.category && options.source) {
+      if (memoizedOptions.category && memoizedOptions.source) {
         // Si on a à la fois category et source, on utilise where sans orderBy pour éviter l'index composé
         q = query(
           collection(db, 'stocks'), 
-          where('categorie', '==', options.category),
-          where('source', '==', options.source)
+          where('categorie', '==', memoizedOptions.category),
+          where('source', '==', memoizedOptions.source)
         );
-      } else if (options.category) {
+      } else if (memoizedOptions.category) {
         q = query(
           collection(db, 'stocks'), 
-          where('categorie', '==', options.category)
+          where('categorie', '==', memoizedOptions.category)
         );
-      } else if (options.source) {
+      } else if (memoizedOptions.source) {
         q = query(
           collection(db, 'stocks'), 
-          where('source', '==', options.source)
+          where('source', '==', memoizedOptions.source)
         );
       } else {
         // Requête simple avec orderBy quand il n'y a pas de where
@@ -68,19 +76,19 @@ export function useStocks(options: UseStocksOptions = {}): UseStocksReturn {
 
             // Trier côté client si on n'a pas pu utiliser orderBy
             let sortedStocks = stocksData;
-            if (options.category || options.source) {
+            if (memoizedOptions.category || memoizedOptions.source) {
               sortedStocks = stocksData.sort((a, b) => a.nom.localeCompare(b.nom));
             }
 
             // Filtrer les stocks faibles si demandé
             let filteredStocks = sortedStocks;
-            if (options.onlyLowStock) {
+            if (memoizedOptions.onlyLowStock) {
               filteredStocks = sortedStocks.filter(stock => stock.quantite <= stock.seuilAlerte);
             }
 
             // Limiter les résultats si demandé
-            if (options.limit) {
-              filteredStocks = filteredStocks.slice(0, options.limit);
+            if (memoizedOptions.limit) {
+              filteredStocks = filteredStocks.slice(0, memoizedOptions.limit);
             }
 
             setStocks(filteredStocks);
@@ -112,7 +120,7 @@ export function useStocks(options: UseStocksOptions = {}): UseStocksReturn {
       setLoading(false);
       return () => {}; // Retourner une fonction vide pour éviter les erreurs
     }
-  }, [options.category, options.source, options.onlyLowStock, options.limit]);
+  }, [memoizedOptions]);
 
   // Calculer les statistiques avec gestion d'erreurs
   const totalValue = stocks.reduce((sum, stock) => {

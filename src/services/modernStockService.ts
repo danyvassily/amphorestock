@@ -330,14 +330,7 @@ export class ModernStockService {
       const q = query(collection(db, this.COLLECTION_NAME));
 
       return onSnapshot(q, (querySnapshot) => {
-        console.log(`📡 Firebase: ${querySnapshot.docs.length} produits reçus`);
-        console.log('🔧 Environment check:', {
-          NODE_ENV: process.env.NODE_ENV,
-          hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-          hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.substring(0, 10) + '...',
-          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
-        });
+        // console.log(`📡 Firebase: ${querySnapshot.docs.length} produits reçus`); // Log désactivé pour les performances
         let products: Product[] = querySnapshot.docs
           .filter(doc => doc.data().isActive !== false) // Exclure les produits supprimés
           .map(doc => {
