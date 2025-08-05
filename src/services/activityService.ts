@@ -23,6 +23,34 @@ import {
   Product
 } from '../types';
 
+// Fonction utilitaire pour nettoyer les objets avant Firebase
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (obj instanceof Date) {
+    return Timestamp.fromDate(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForFirestore(item));
+  }
+  
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanForFirestore(value);
+    }
+  }
+  
+  return cleaned;
+}
+
 /**
  * Service de gestion de l'historique des activités
  * 📝 Enregistrement de toutes les actions utilisateur
@@ -64,11 +92,7 @@ export class ActivityService {
         ...additionalData
       };
 
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), {
-        ...activity,
-        createdAt: Timestamp.fromDate(activity.createdAt),
-        undoExpiry: activity.undoExpiry ? Timestamp.fromDate(activity.undoExpiry) : null
-      });
+      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), cleanForFirestore(activity));
 
       // Nettoyer les anciennes activités si nécessaire
       await this.cleanupOldActivities();

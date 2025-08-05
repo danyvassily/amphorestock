@@ -26,6 +26,34 @@ import {
   ProductCategory
 } from '../types';
 
+// Fonction utilitaire pour nettoyer les objets avant Firebase
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (obj instanceof Date) {
+    return Timestamp.fromDate(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForFirestore(item));
+  }
+  
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanForFirestore(value);
+    }
+  }
+  
+  return cleaned;
+}
+
 /**
  * Service de gestion des statistiques avancées
  * 📊 Gestion complète des stats de ventes et analyses
@@ -66,10 +94,7 @@ export class StatisticsService {
         createdAt: now,
         createdBy: userId
       };
-      batch.set(movementRef, {
-        ...movement,
-        createdAt: Timestamp.fromDate(movement.createdAt)
-      });
+      batch.set(movementRef, cleanForFirestore(movement));
 
       // 2. Mettre à jour les statistiques journalières
       await this.updateDailyStats(today, product, quantity, salePrice, batch);
@@ -182,12 +207,11 @@ export class StatisticsService {
         updatedAt: new Date()
       };
 
-      batch.set(statsRef, {
+      batch.set(statsRef, cleanForFirestore({
         ...newStats,
-        date: Timestamp.fromDate(newStats.date),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      }));
     }
   }
 
@@ -274,12 +298,11 @@ export class StatisticsService {
         updatedAt: new Date()
       };
 
-      batch.set(globalRef, {
+      batch.set(globalRef, cleanForFirestore({
         ...newGlobalStats,
-        firstSaleDate: Timestamp.fromDate(newGlobalStats.firstSaleDate),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      }));
     }
   }
 
@@ -382,11 +405,11 @@ export class StatisticsService {
         updatedAt: new Date()
       };
 
-      batch.set(globalRef, {
+      batch.set(globalRef, cleanForFirestore({
         ...resetGlobalStats,
         lastResetDate: serverTimestamp(),
         updatedAt: serverTimestamp()
-      }, { merge: true });
+      }), { merge: true });
 
       await batch.commit();
       console.log('🔄 Toutes les statistiques ont été remises à zéro');

@@ -40,9 +40,9 @@ import { toast } from 'sonner';
 export default function StockPage() {
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [stockStatusFilter, setStockStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('nom');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [stockStatusFilter, setStockStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('nom');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -67,9 +67,9 @@ export default function StockPage() {
     clearError
   } = useGeneralStock({
     search: searchTerm,
-    category: categoryFilter === 'all' ? undefined : categoryFilter,
-    stockStatus: stockStatusFilter === 'all' ? undefined : stockStatusFilter,
-    sortBy: sortBy,
+    category: categoryFilter === 'all' ? undefined : categoryFilter as any,
+    stockStatus: stockStatusFilter === 'all' ? undefined : stockStatusFilter as any,
+    sortBy: sortBy as any,
     sortOrder: sortDirection
   });
 
@@ -346,7 +346,7 @@ export default function StockPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6 ipad-optimized">
       {/* En-tête avec indicateur de connexion */}
       <div className="flex items-start justify-between">
         <div>
@@ -426,7 +426,7 @@ export default function StockPage() {
       )}
 
       {/* Statistiques du stock général */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 ipad-card-grid">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -479,8 +479,8 @@ export default function StockPage() {
       {/* Filtres et recherche */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col md:flex-row gap-4 ipad-optimized">
+            <div className="flex-1 min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -492,32 +492,34 @@ export default function StockPage() {
               </div>
             </div>
             
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Catégorie" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes catégories</SelectItem>
-                <SelectItem value="spiritueux">🥃 Spiritueux</SelectItem>
-                <SelectItem value="bieres">🍺 Bières</SelectItem>
-                <SelectItem value="softs">🥤 Softs</SelectItem>
-                <SelectItem value="jus">🧃 Jus</SelectItem>
-                <SelectItem value="eaux">💧 Eaux</SelectItem>
-                <SelectItem value="autres">📦 Autres</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-2 md:gap-4 sm:w-auto">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-44 md:w-48">
+                  <SelectValue placeholder="Catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes catégories</SelectItem>
+                  <SelectItem value="spiritueux">🥃 Spiritueux</SelectItem>
+                  <SelectItem value="bieres">🍺 Bières</SelectItem>
+                  <SelectItem value="softs">🥤 Softs</SelectItem>
+                  <SelectItem value="jus">🧃 Jus</SelectItem>
+                  <SelectItem value="eaux">💧 Eaux</SelectItem>
+                  <SelectItem value="autres">📦 Autres</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={stockStatusFilter} onValueChange={setStockStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="État du stock" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les états</SelectItem>
-                <SelectItem value="normal">Stock normal</SelectItem>
-                <SelectItem value="low">Stock faible</SelectItem>
-                <SelectItem value="out">En rupture</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={stockStatusFilter} onValueChange={setStockStatusFilter}>
+                <SelectTrigger className="w-full sm:w-44 md:w-48">
+                  <SelectValue placeholder="État du stock" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les états</SelectItem>
+                  <SelectItem value="normal">Stock normal</SelectItem>
+                  <SelectItem value="low">Stock faible</SelectItem>
+                  <SelectItem value="out">En rupture</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -528,7 +530,7 @@ export default function StockPage() {
           <CardTitle>Inventaire du stock général ({stockGeneral.length} produits)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border ipad-table-container">
             <Table>
               <TableHeader>
                 <TableRow>

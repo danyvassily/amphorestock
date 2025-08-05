@@ -27,6 +27,34 @@ import { ModernStockService } from './modernStockService';
 import { ActivityService } from './activityService';
 import { StatisticsService } from './statisticsService';
 
+// Fonction utilitaire pour nettoyer les objets avant Firebase
+function cleanForFirestore(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  if (obj instanceof Date) {
+    return Timestamp.fromDate(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanForFirestore(item));
+  }
+  
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      cleaned[key] = cleanForFirestore(value);
+    }
+  }
+  
+  return cleaned;
+}
+
 /**
  * 🤖 Service d'Intelligence Artificielle pour la prédiction et l'optimisation des stocks
  * 📈 Analyse des tendances et génération de recommandations
@@ -101,11 +129,11 @@ export class AIPredictionService {
       ];
 
       for (const model of defaultModels) {
-        await addDoc(collection(db, this.MODELS_COLLECTION), {
+        await addDoc(collection(db, this.MODELS_COLLECTION), cleanForFirestore({
           ...model,
-          createdAt: Timestamp.fromDate(new Date()),
-          updatedAt: Timestamp.fromDate(new Date())
-        });
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
       }
 
       console.log('🤖 Modèles IA initialisés avec succès');
@@ -257,11 +285,7 @@ export class AIPredictionService {
         predictions.push(prediction);
 
         // Sauvegarder la prédiction
-        await addDoc(collection(db, this.PREDICTIONS_COLLECTION), {
-          ...prediction,
-          date: Timestamp.fromDate(prediction.date),
-          createdAt: Timestamp.fromDate(prediction.createdAt)
-        });
+        await addDoc(collection(db, this.PREDICTIONS_COLLECTION), cleanForFirestore(prediction));
       }
 
       console.log(`🔮 ${predictions.length} prédictions générées pour ${product.nom}`);
@@ -932,11 +956,7 @@ export class AIPredictionService {
     };
 
     // Sauvegarder l'alerte
-    await addDoc(collection(db, this.ALERTS_COLLECTION), {
-      ...alert,
-      createdAt: Timestamp.fromDate(alert.createdAt),
-      expiresAt: Timestamp.fromDate(alert.expiresAt!)
-    });
+    await addDoc(collection(db, this.ALERTS_COLLECTION), cleanForFirestore(alert));
 
     return alert;
   }

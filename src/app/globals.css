@@ -214,3 +214,167 @@
     display: none;
   }
 }
+
+/* Optimisations spécifiques pour iPad */
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* iPad portrait et paysage */
+  .ipad-optimized {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Tables responsive pour iPad */
+  .ipad-table-container {
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+  }
+  
+  .ipad-table-container::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .ipad-table-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .ipad-table-container::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 3px;
+  }
+  
+  /* Grilles adaptatives pour iPad */
+  .ipad-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  
+  .ipad-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+  
+  .ipad-sidebar-collapsed {
+    width: 60px;
+  }
+  
+  .ipad-sidebar-expanded {
+    width: 240px;
+  }
+  
+  /* Optimisation des cartes pour iPad */
+  .ipad-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    max-width: 100%;
+  }
+  
+  /* Formulaires optimisés pour iPad */
+  .ipad-form-layout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+    max-width: 100%;
+  }
+}
+
+/* iPad portrait spécifique */
+@media (min-width: 768px) and (max-width: 834px) and (orientation: portrait) {
+  .ipad-portrait-single-col {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .ipad-portrait-sidebar {
+    width: 200px;
+  }
+}
+
+/* iPad paysage spécifique */
+@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape) {
+  .ipad-landscape-full {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+}
+
+/* Classes utilitaires spécifiques pour iPad */
+@media (min-width: 768px) and (max-width: 1366px) {
+  .hide-on-ipad {
+    display: none !important;
+  }
+  
+  .show-on-ipad {
+    display: block !important;
+  }
+  
+  .ipad-text-sm {
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+  }
+  
+  .ipad-p-2 {
+    padding: 0.5rem !important;
+  }
+  
+  .ipad-gap-2 {
+    gap: 0.5rem !important;
+  }
+  
+  .ipad-w-full {
+    width: 100% !important;
+  }
+  
+  /* Optimisation des boutons pour iPad */
+  .ipad-btn-touch {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Spacing adaptatif pour iPad */
+  .ipad-responsive-spacing {
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+  }
+  
+  /* Container adaptatif pour iPad */
+  .ipad-container {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* Styles pour les widgets dashboard - éviter débordement */
+.react-grid-item .card {
+  height: 100%;
+  overflow: hidden;
+}
+
+.react-grid-item .card-content {
+  max-height: calc(100% - 4rem); /* Ajuster selon la hauteur du header */
+  overflow-y: auto;
+}
+
+/* Optimisation des widgets sur petits écrans */
+@media (max-width: 768px) {
+  .react-grid-item .card-title {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+  
+  .react-grid-item .card-description {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+  
+  .react-grid-item .badge {
+    font-size: 0.625rem;
+    padding: 0.125rem 0.25rem;
+  }
+}

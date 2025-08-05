@@ -88,6 +88,7 @@ export default function AddProductPage() {
       const productData = {
         nom: data.name,
         categorie: data.category,
+        type: (data.category as string).includes('vin') ? 'vins' as const : 'general' as const,
         subcategory: data.subcategory,
         quantite: data.quantity,
         unite: data.unit,
@@ -119,7 +120,7 @@ export default function AddProductPage() {
   const watchedCategory = form.watch("category");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 ipad-optimized">
       {/* En-tête */}
       <div className="flex items-center gap-4">
         <Button variant="outline" size="sm" asChild>
@@ -141,9 +142,9 @@ export default function AddProductPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3 ipad-form-layout">
             {/* Informations générales */}
-            <Card className="lg:col-span-2">
+            <Card className="md:col-span-1 lg:col-span-2">
               <CardHeader>
                 <CardTitle>Informations Générales</CardTitle>
                 <CardDescription>
@@ -165,7 +166,7 @@ export default function AddProductPage() {
                   )}
                 />
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 ipad-optimized">
                   <FormField
                     control={form.control}
                     name="category"
@@ -225,7 +226,7 @@ export default function AddProductPage() {
                   )}
                 />
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 ipad-optimized">
                   <FormField
                     control={form.control}
                     name="fournisseur"

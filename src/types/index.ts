@@ -15,6 +15,7 @@ export interface Product {
   id: string;
   nom: string; // Nom du produit
   categorie: ProductCategory; // Catégorie du produit
+  subcategory?: string; // Sous-catégorie optionnelle
   type: 'vins' | 'general'; // Type principal : vins ou stock général
   quantite: number; // Quantité en stock
   unite: ProductUnit; // Unité de mesure

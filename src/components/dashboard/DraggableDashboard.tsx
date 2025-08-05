@@ -27,7 +27,7 @@ import { AIAlertsWidget } from '../widgets/AIAlertsWidget';
 import { StatsDashboard } from '../charts/StatsDashboard';
 
 // Types
-import { DashboardWidget, DashboardLayout, WidgetConfig } from '@/types';
+import { DashboardWidget, WidgetConfig } from '@/types';
 
 // Styles pour react-grid-layout
 import 'react-grid-layout/css/styles.css';
@@ -41,12 +41,12 @@ interface DraggableDashboardProps {
   className?: string;
 }
 
-// Configuration par défaut des widgets
+// Configuration par défaut des widgets optimisée pour iPad
 const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
     type: 'stats_overview',
     title: 'Statistiques de vente',
-    position: { x: 0, y: 0, w: 12, h: 8 },
+    position: { x: 0, y: 0, w: 12, h: 8 }, // Pleine largeur sur desktop
     isVisible: true,
     config: {
       showTitle: true,
@@ -60,12 +60,12 @@ const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'createdAt' | 'updatedAt'>[]
   {
     type: 'recent_activity',
     title: 'Activités récentes',
-    position: { x: 0, y: 8, w: 4, h: 6 },
+    position: { x: 0, y: 8, w: 4, h: 6 }, // Adaptatif : 4/12 sur desktop, 3/8 sur iPad
     isVisible: true,
     config: {
       showTitle: true,
       activityConfig: {
-        maxItems: 10,
+        maxItems: 8, // Réduit pour iPad
         showUserActions: true,
         showSystemActions: true,
         groupByDate: false
@@ -75,12 +75,12 @@ const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'createdAt' | 'updatedAt'>[]
   {
     type: 'ai_alerts',
     title: 'Intelligence Artificielle',
-    position: { x: 4, y: 8, w: 4, h: 6 },
+    position: { x: 4, y: 8, w: 4, h: 6 }, // Adaptatif : 4/12 sur desktop, 3/8 sur iPad
     isVisible: true,
     config: {
       showTitle: true,
       alertsConfig: {
-        maxItems: 8,
+        maxItems: 6, // Réduit pour iPad
         autoRefresh: true
       }
     }
@@ -88,7 +88,7 @@ const DEFAULT_WIDGETS: Omit<DashboardWidget, 'id' | 'createdAt' | 'updatedAt'>[]
   {
     type: 'report_generator',
     title: 'Rapports Automatiques',
-    position: { x: 8, y: 8, w: 4, h: 6 },
+    position: { x: 8, y: 8, w: 4, h: 6 }, // Adaptatif : 4/12 sur desktop, 2/8 sur iPad
     isVisible: true,
     config: {
       showTitle: true
@@ -101,18 +101,34 @@ export function DraggableDashboard({
   layoutId = 'default',
   className = '' 
 }: DraggableDashboardProps) {
+  // Utiliser layoutId et userId pour le localStorage ou la configuration future
+  console.debug('DraggableDashboard initialized with layoutId:', layoutId, 'userId:', userId);
   const [widgets, setWidgets] = useState<DashboardWidget[]>([]);
   const [layouts, setLayouts] = useState<{ [key: string]: Layout[] }>({});
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
-  // Configuration de la grille
+  // Configuration de la grille optimisée pour iPad
   const gridConfig = {
-    cols: { lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 },
-    rowHeight: 30,
-    margin: [16, 16] as [number, number],
-    containerPadding: [16, 16] as [number, number]
+    cols: { 
+      lg: 12,        // Desktop large (≥1024px)
+      md: 8,         // iPad paysage/petit desktop (768px-1024px) 
+      sm: 6,         // Tablette portrait (640px-768px)
+      xs: 4,         // Mobile large (480px-640px)
+      xxs: 2         // Mobile petit (<480px)
+    },
+    rowHeight: 35,   // Augmenté pour meilleure lisibilité sur tablette
+    margin: [12, 12] as [number, number],     // Réduit pour iPad
+    containerPadding: [12, 12] as [number, number],
+    // Breakpoints personnalisés pour iPad
+    breakpoints: { 
+      lg: 1024, 
+      md: 768,       // iPad portrait et petit paysage
+      sm: 640, 
+      xs: 480, 
+      xxs: 0 
+    }
   };
 
   // Initialiser les widgets par défaut
@@ -127,7 +143,7 @@ export function DraggableDashboard({
 
       setWidgets(defaultWidgets);
       
-      // Convertir en layouts pour react-grid-layout
+      // Convertir en layouts pour react-grid-layout avec optimisation iPad
       const gridLayouts = {
         lg: defaultWidgets.map(widget => ({
           i: widget.id,
@@ -137,7 +153,37 @@ export function DraggableDashboard({
           h: widget.position.h,
           minW: 2,
           minH: 2
-        }))
+        })),
+        // Layout optimisé pour iPad (md = 8 colonnes)
+        md: defaultWidgets.map((widget, index) => {
+          switch(widget.type) {
+            case 'stats_overview':
+              return { i: widget.id, x: 0, y: 0, w: 8, h: 8, minW: 4, minH: 6 };
+            case 'recent_activity':
+              return { i: widget.id, x: 0, y: 8, w: 3, h: 6, minW: 2, minH: 4 };
+            case 'ai_alerts':
+              return { i: widget.id, x: 3, y: 8, w: 3, h: 6, minW: 2, minH: 4 };
+            case 'report_generator':
+              return { i: widget.id, x: 6, y: 8, w: 2, h: 8, minW: 2, minH: 6 };
+            default:
+              return { i: widget.id, x: 0, y: index * 6, w: 4, h: 4, minW: 2, minH: 2 };
+          }
+        }),
+        // Layout pour tablettes portrait (sm = 6 colonnes) 
+        sm: defaultWidgets.map((widget, index) => {
+          switch(widget.type) {
+            case 'stats_overview':
+              return { i: widget.id, x: 0, y: 0, w: 6, h: 8, minW: 4, minH: 6 };
+            case 'recent_activity':
+              return { i: widget.id, x: 0, y: 8, w: 6, h: 6, minW: 4, minH: 4 };
+            case 'ai_alerts':
+              return { i: widget.id, x: 0, y: 14, w: 6, h: 8, minW: 4, minH: 6 };
+            case 'report_generator':
+              return { i: widget.id, x: 0, y: 22, w: 6, h: 8, minW: 4, minH: 6 };
+            default:
+              return { i: widget.id, x: 0, y: index * 6, w: 6, h: 4, minW: 4, minH: 2 };
+          }
+        })
       };
       
       setLayouts(gridLayouts);
@@ -245,7 +291,7 @@ export function DraggableDashboard({
     } finally {
       setSaving(false);
     }
-  }, [widgets, layouts, userId]);
+  }, []);
 
   // Réinitialiser le layout
   const resetLayout = useCallback(() => {

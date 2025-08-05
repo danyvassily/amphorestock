@@ -43,8 +43,8 @@ export default function VinsPage() {
     clearError
   } = useVins({
     search: searchTerm,
-    category: categoryFilter === 'all' ? undefined : categoryFilter,
-    sortBy: sortBy,
+    category: categoryFilter === 'all' ? undefined : categoryFilter as any,
+    sortBy: sortBy as any,
     sortOrder: 'asc'
   });
 
