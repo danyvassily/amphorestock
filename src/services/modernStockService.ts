@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Product, ProductFormData, FilterOptions, StockMovement, MovementType } from '../types';
+import { StatisticsService } from './statisticsService';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -283,7 +284,56 @@ export class ModernStockService {
   }
 
   /**
-   * 📤 Retirer du stock (sortie)
+   * 🛒 Enregistrer une vente avec statistiques
+   */
+  static async recordSale(
+    productId: string,
+    quantity: number,
+    salePrice: number,
+    saleType: 'verre' | 'bouteille' | 'unite' = 'unite',
+    userId = 'system'
+  ): Promise<void> {
+    try {
+      const product = await this.getProductById(productId);
+      if (!product) throw new Error('Produit non trouvé');
+
+      if (product.quantite < quantity) {
+        throw new Error('Stock insuffisant');
+      }
+
+      // 1. Retirer du stock
+      const newQuantity = Math.max(0, product.quantite - quantity);
+      await this.updateQuantity(
+        productId, 
+        newQuantity, 
+        'sortie', 
+        `Vente ${saleType} - ${(salePrice * quantity).toFixed(2)}€`, 
+        userId
+      );
+
+      // 2. Enregistrer les statistiques de vente
+      await StatisticsService.recordSale(
+        product,
+        quantity,
+        salePrice,
+        saleType,
+        userId
+      );
+
+      console.log('🛒 Vente enregistrée avec succès:', {
+        produit: product.nom,
+        quantité: quantity,
+        prix: salePrice,
+        total: salePrice * quantity
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'enregistrement de la vente:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📤 Retirer du stock (sortie simple sans statistiques)
    */
   static async removeStock(
     productId: string,

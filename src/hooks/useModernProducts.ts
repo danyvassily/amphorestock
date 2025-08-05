@@ -149,6 +149,20 @@ export function useModernProducts(filters?: FilterOptions) {
     }
   }, []);
 
+  const recordSale = useCallback(async (
+    productId: string, 
+    quantity: number, 
+    salePrice: number, 
+    saleType: 'verre' | 'bouteille' | 'unite' = 'unite'
+  ): Promise<void> => {
+    try {
+      await ModernStockService.recordSale(productId, quantity, salePrice, saleType);
+    } catch (err) {
+      setError(`Erreur lors de l'enregistrement de la vente: ${err}`);
+      throw err;
+    }
+  }, []);
+
   // Statistiques dérivées
   const stats = useMemo(() => {
     const totalProducts = products.length;
@@ -199,6 +213,7 @@ export function useModernProducts(filters?: FilterOptions) {
     updateQuantity,
     addStock,
     removeStock,
+    recordSale,
     clearError,
   };
 }

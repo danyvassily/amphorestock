@@ -14,14 +14,62 @@ import {
   Plus,
   Zap,
   Loader2,
+  Activity,
+  Search,
+  Settings,
+  LayoutDashboard
 } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useStocks } from "@/hooks/useStocks";
 import { Product } from "@/types";
+import { AppInitializer } from "@/lib/initializeApp";
+
+// UniversalSearch chargée dynamiquement aussi pour éviter les problèmes SSR
+const UniversalSearch = dynamic(
+  () => import("@/components/search/UniversalSearch").then(mod => ({ default: mod.UniversalSearch })),
+  {
+    ssr: false,
+    loading: () => null
+  }
+);
+
+// Charger DraggableDashboard dynamiquement pour éviter les erreurs SSR
+const DraggableDashboard = dynamic(
+  () => import("@/components/dashboard/DraggableDashboard").then(mod => ({ default: mod.DraggableDashboard })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Chargement du dashboard...</span>
+      </div>
+    )
+  }
+);
 
 export default function DashboardPage() {
   const { stocks, loading, error, totalValue, lowStockCount, categoriesStats } = useStocks();
   const { stocks: lowStockProducts } = useStocks({ onlyLowStock: true, limit: 5 });
+  
+  // Initialisation automatique de l'application
+  useEffect(() => {
+    const initializeIfNeeded = async () => {
+      try {
+        const status = await AppInitializer.checkAppStatus();
+        
+        // Si pas de données, initialiser automatiquement
+        if (!status.hasProducts || !status.hasActivities) {
+          console.log('🚀 Initialisation automatique des données...');
+          await AppInitializer.initializeApp();
+        }
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation:', error);
+      }
+    };
+    
+    initializeIfNeeded();
+  }, []); // Ne s'exécute qu'une fois au montage
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -69,27 +117,37 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* En-tête du dashboard */}
-      <div className="flex items-center justify-between">
+      {/* En-tête du dashboard avec recherche universelle */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Vue d&apos;ensemble de votre stock et de vos ventes
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <LayoutDashboard className="h-8 w-8 text-primary" />
+            Dashboard
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Vue d&apos;ensemble personnalisable de votre activité
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild>
-            <Link href="/service">
-              <Zap className="mr-2 h-4 w-4" />
-              Service Rapide
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/produits/add">
-              <Plus className="mr-2 h-4 w-4" />
-              Ajouter un produit
-            </Link>
-          </Button>
+        
+        <div className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-3">
+          {/* Recherche universelle */}
+          <UniversalSearch className="w-full sm:w-80" />
+          
+          {/* Actions rapides */}
+          <div className="flex gap-2">
+            <Button asChild size="sm">
+              <Link href="/service">
+                <Zap className="mr-2 h-4 w-4" />
+                Service
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/produits/add">
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -281,6 +339,15 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dashboard personnalisable avec widgets déplaçables */}
+      <div className="mt-8">
+        <DraggableDashboard 
+          userId="current-user" 
+          layoutId="main-dashboard"
+          className="min-h-screen"
+        />
+      </div>
     </div>
   );
 } 

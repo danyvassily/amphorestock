@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Search, Plus, Minus, Wine, AlertTriangle, Edit, Trash2, Wifi, WifiOff, Clock } from 'lucide-react';
 import { Product, ProductFormData } from '@/types';
+import { ActivityService } from '@/services/activityService';
 import { toast } from 'sonner';
 
 export default function VinsPage() {
@@ -38,6 +39,7 @@ export default function VinsPage() {
     deleteProduct,
     removeStock,
     addStock,
+    recordSale,
     clearError
   } = useVins({
     search: searchTerm,
@@ -74,10 +76,22 @@ export default function VinsPage() {
   const handleQuickSale = async (product: Product, type: 'verre' | 'bouteille') => {
     try {
       const quantity = 1; // 1 verre ou 1 bouteille
-      await removeStock(product.id, quantity, `Vente ${type}`);
+      
+      // Déterminer le prix de vente selon le type
+      let salePrice: number;
+      if (type === 'verre' && product.prixVerre) {
+        salePrice = product.prixVerre;
+      } else if (type === 'bouteille' && product.prixBouteille) {
+        salePrice = product.prixBouteille;
+      } else {
+        salePrice = product.prixVente; // Prix de vente par défaut
+      }
+      
+      // Enregistrer la vente avec statistiques
+      await recordSale(product.id, quantity, salePrice, type);
       
       toast.success(`Vente ${type} enregistrée`, {
-        description: `${product.nom} - ${quantity} ${type}`,
+        description: `${product.nom} - ${quantity} ${type} (${salePrice.toFixed(2)}€)`,
       });
     } catch (error) {
       toast.error('Erreur lors de la vente', {
@@ -88,7 +102,18 @@ export default function VinsPage() {
 
   const handleAddStock = async (product: Product, quantity: number = 1) => {
     try {
+      const oldQuantity = product.quantite;
       await addStock(product.id, quantity, `Ajout manuel - ${quantity} bouteille${quantity > 1 ? 's' : ''}`);
+      
+      // Enregistrer l'activité
+      await ActivityService.recordStockActivity(
+        product,
+        oldQuantity,
+        oldQuantity + quantity,
+        `Ajout manuel de ${quantity} bouteille${quantity > 1 ? 's' : ''}`,
+        'current-user',
+        'Utilisateur'
+      );
       
       toast.success(`Stock ajouté avec succès`, {
         description: `${product.nom} - +${quantity} bouteille${quantity > 1 ? 's' : ''}`,
@@ -103,6 +128,23 @@ export default function VinsPage() {
   const handleAddProduct = async (productData: ProductFormData) => {
     try {
       await addProduct({ ...productData, type: 'vins' });
+      
+      // Enregistrer l'activité de création
+      await ActivityService.recordActivity(
+        'product_created',
+        `Nouveau vin ajouté - ${productData.nom}`,
+        `Le vin "${productData.nom}" (${productData.categorie}) a été ajouté avec ${productData.quantite} bouteille(s)`,
+        'success',
+        'current-user',
+        'Utilisateur',
+        {
+          productName: productData.nom,
+          categoryId: productData.categorie,
+          quantity: productData.quantite,
+          price: productData.prixVente
+        }
+      );
+      
       setShowAddDialog(false);
       toast.success('Vin ajouté avec succès');
     } catch (error) {
